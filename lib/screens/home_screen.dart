@@ -56,10 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _toggleRecording() async {
-    if (_busy) {
-      debugPrint('Ignoring tap: already busy');
-      return;
-    }
+    if (_busy) return;
     _busy = true;
     try {
       if (_isRecording) {
@@ -73,10 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _startRecording() async {
-    debugPrint('Requesting mic permission...');
-    final granted = await _recorder.hasPermission();
-    debugPrint('Permission granted: $granted');
-    if (!granted) {
+    if (!await _recorder.hasPermission()) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('මයික්‍රෆෝන් අවසරය අවශ්‍යයි')),
@@ -88,13 +82,9 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final id = DateTime.now().microsecondsSinceEpoch.toString();
       final path = await _repository.pathForNewRecording('$id.webm');
-      debugPrint('Starting recorder at path: $path');
       await _recorder.start(
         const RecordConfig(encoder: AudioEncoder.opus),
         path: path,
-      );
-      debugPrint(
-        'Recorder.start() returned. isRecording=${await _recorder.isRecording()}',
       );
 
       setState(() {
@@ -104,16 +94,11 @@ class _HomeScreenState extends State<HomeScreen> {
         _currentRecordingId = id;
       });
 
-      _ticker = Timer.periodic(const Duration(seconds: 1), (_) async {
-        final stillRecording = await _recorder.isRecording();
-        debugPrint(
-          'Tick at ${DateTime.now().difference(_startedAt!)}: isRecording=$stillRecording',
-        );
-        if (!mounted) return;
+      _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
         setState(() => _elapsed = DateTime.now().difference(_startedAt!));
       });
-    } catch (e, st) {
-      debugPrint('Failed to start recording: $e\n$st');
+    } catch (e) {
+      debugPrint('Failed to start recording: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('පටිගත කිරීම ආරම්භ කළ නොහැක: $e')),
@@ -125,11 +110,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _stopRecording() async {
     _ticker?.cancel();
     try {
-      debugPrint(
-        'Stopping recorder. isRecording=${await _recorder.isRecording()}',
-      );
       final recordedPath = await _recorder.stop();
-      debugPrint('Recorder stopped, path: $recordedPath');
 
       if (recordedPath != null && _currentRecordingId != null) {
         final recording = await _repository.finalize(
@@ -140,10 +121,9 @@ class _HomeScreenState extends State<HomeScreen> {
         );
         _recordings.insert(0, recording);
         await _repository.save(_recordings);
-        debugPrint('Saved recording, total count: ${_recordings.length}');
       }
-    } catch (e, st) {
-      debugPrint('Failed to stop/save recording: $e\n$st');
+    } catch (e) {
+      debugPrint('Failed to stop/save recording: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('පටිගත කිරීම සුරැකිය නොහැක: $e')),
