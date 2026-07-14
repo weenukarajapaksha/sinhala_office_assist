@@ -154,6 +154,42 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  Future<bool> _confirmDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('පටිගත කිරීම මකන්නද?'),
+        content: const Text(
+          'මෙම පටිගත කිරීම මකා දැමීමට ඔබට විශ්වාසද? මෙය අවලංගු කළ නොහැක.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('අවලංගු කරන්න'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(
+              'මකන්න',
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
+  }
+
+  Future<void> _deleteRecording(Recording recording) async {
+    if (_playingId == recording.id) {
+      await _player.stop();
+      _playingId = null;
+    }
+    setState(() => _recordings.removeWhere((r) => r.id == recording.id));
+    await _repository.save(_recordings);
+    await _repository.delete(recording);
+  }
+
   String _formatDuration(Duration d) {
     String two(int n) => n.toString().padLeft(2, '0');
     final minutes = two(d.inMinutes.remainder(60));
