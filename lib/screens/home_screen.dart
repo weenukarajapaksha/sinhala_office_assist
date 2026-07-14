@@ -72,35 +72,55 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    final id = DateTime.now().microsecondsSinceEpoch.toString();
-    final path = await _repository.pathForNewRecording('$id.m4a');
-    await _recorder.start(const RecordConfig(), path: path);
+    try {
+      final id = DateTime.now().microsecondsSinceEpoch.toString();
+      final path = await _repository.pathForNewRecording('$id.m4a');
+      await _recorder.start(const RecordConfig(), path: path);
 
-    setState(() {
-      _isRecording = true;
-      _elapsed = Duration.zero;
-      _startedAt = DateTime.now();
-      _currentRecordingId = id;
-    });
+      setState(() {
+        _isRecording = true;
+        _elapsed = Duration.zero;
+        _startedAt = DateTime.now();
+        _currentRecordingId = id;
+      });
 
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      setState(() => _elapsed = DateTime.now().difference(_startedAt!));
-    });
+      _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+        setState(() => _elapsed = DateTime.now().difference(_startedAt!));
+      });
+    } catch (e, st) {
+      debugPrint('Failed to start recording: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('පටිගත කිරීම ආරම්භ කළ නොහැක: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _stopRecording() async {
     _ticker?.cancel();
-    final recordedPath = await _recorder.stop();
+    try {
+      final recordedPath = await _recorder.stop();
+      debugPrint('Recorder stopped, path: $recordedPath');
 
-    if (recordedPath != null && _currentRecordingId != null) {
-      final recording = await _repository.finalize(
-        id: _currentRecordingId!,
-        recordedPath: recordedPath,
-        recordedAt: _startedAt!,
-        duration: _elapsed,
-      );
-      _recordings.insert(0, recording);
-      await _repository.save(_recordings);
+      if (recordedPath != null && _currentRecordingId != null) {
+        final recording = await _repository.finalize(
+          id: _currentRecordingId!,
+          recordedPath: recordedPath,
+          recordedAt: _startedAt!,
+          duration: _elapsed,
+        );
+        _recordings.insert(0, recording);
+        await _repository.save(_recordings);
+        debugPrint('Saved recording, total count: ${_recordings.length}');
+      }
+    } catch (e, st) {
+      debugPrint('Failed to stop/save recording: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('පටිගත කිරීම සුරැකිය නොහැක: $e')),
+        );
+      }
     }
 
     setState(() {
