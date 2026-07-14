@@ -56,15 +56,27 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _toggleRecording() async {
-    if (_isRecording) {
-      await _stopRecording();
-    } else {
-      await _startRecording();
+    if (_busy) {
+      debugPrint('Ignoring tap: already busy');
+      return;
+    }
+    _busy = true;
+    try {
+      if (_isRecording) {
+        await _stopRecording();
+      } else {
+        await _startRecording();
+      }
+    } finally {
+      _busy = false;
     }
   }
 
   Future<void> _startRecording() async {
-    if (!await _recorder.hasPermission()) {
+    debugPrint('Requesting mic permission...');
+    final granted = await _recorder.hasPermission();
+    debugPrint('Permission granted: $granted');
+    if (!granted) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('මයික්‍රෆෝන් අවසරය අවශ්‍යයි')),
@@ -76,7 +88,11 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final id = DateTime.now().microsecondsSinceEpoch.toString();
       final path = await _repository.pathForNewRecording('$id.m4a');
+      debugPrint('Starting recorder at path: $path');
       await _recorder.start(const RecordConfig(), path: path);
+      debugPrint(
+        'Recorder.start() returned. isRecording=${await _recorder.isRecording()}',
+      );
 
       setState(() {
         _isRecording = true;
@@ -101,6 +117,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _stopRecording() async {
     _ticker?.cancel();
     try {
+      debugPrint(
+        'Stopping recorder. isRecording=${await _recorder.isRecording()}',
+      );
       final recordedPath = await _recorder.stop();
       debugPrint('Recorder stopped, path: $recordedPath');
 
