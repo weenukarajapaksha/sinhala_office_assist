@@ -23,6 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool _isRecording = false;
   bool _isLoading = true;
+  bool _busy = false;
   Duration _elapsed = Duration.zero;
   Timer? _ticker;
   DateTime? _startedAt;
