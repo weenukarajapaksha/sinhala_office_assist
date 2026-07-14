@@ -14,3 +14,8 @@ Future<Uint8List?> captureBytes(String recordedPath) async {
   final buffer = await response.arrayBuffer().toDart;
   return buffer.toDart.asUint8List();
 }
+
+/// Audio bytes on web live inline in SharedPreferences (via [captureBytes]),
+/// so removing the recording from the saved list is enough; there's no
+/// separate file to clean up.
+Future<void> deleteRecordedFile(String? filePath) async {}

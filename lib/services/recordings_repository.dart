@@ -43,6 +43,8 @@ class RecordingsRepository {
     }).toList();
   }
 
+  Future<void> delete(Recording recording) => deleteRecordedFile(recording.filePath);
+
   Future<void> save(List<Recording> recordings) async {
     final prefs = await SharedPreferences.getInstance();
     final raw = recordings
