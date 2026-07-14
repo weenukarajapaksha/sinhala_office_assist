@@ -101,7 +101,12 @@ class _HomeScreenState extends State<HomeScreen> {
         _currentRecordingId = id;
       });
 
-      _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      _ticker = Timer.periodic(const Duration(seconds: 1), (_) async {
+        final stillRecording = await _recorder.isRecording();
+        debugPrint(
+          'Tick at ${DateTime.now().difference(_startedAt!)}: isRecording=$stillRecording',
+        );
+        if (!mounted) return;
         setState(() => _elapsed = DateTime.now().difference(_startedAt!));
       });
     } catch (e, st) {
