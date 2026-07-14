@@ -87,9 +87,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       final id = DateTime.now().microsecondsSinceEpoch.toString();
-      final path = await _repository.pathForNewRecording('$id.m4a');
+      final path = await _repository.pathForNewRecording('$id.webm');
       debugPrint('Starting recorder at path: $path');
-      await _recorder.start(const RecordConfig(), path: path);
+      await _recorder.start(
+        const RecordConfig(encoder: AudioEncoder.opus),
+        path: path,
+      );
       debugPrint(
         'Recorder.start() returned. isRecording=${await _recorder.isRecording()}',
       );
