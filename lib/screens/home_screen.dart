@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:record/record.dart';
 
 import '../models/recording.dart';
+import '../services/recordings_repository.dart';
 import '../theme/app_theme.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -17,13 +18,33 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final AudioRecorder _recorder = AudioRecorder();
   final AudioPlayer _player = AudioPlayer();
+  final RecordingsRepository _repository = RecordingsRepository();
   final List<Recording> _recordings = [];
 
   bool _isRecording = false;
+  bool _isLoading = true;
   Duration _elapsed = Duration.zero;
   Timer? _ticker;
   DateTime? _startedAt;
+  String? _currentRecordingId;
   String? _playingId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecordings();
+  }
+
+  Future<void> _loadRecordings() async {
+    final recordings = await _repository.load();
+    if (!mounted) return;
+    setState(() {
+      _recordings
+        ..clear()
+        ..addAll(recordings);
+      _isLoading = false;
+    });
+  }
 
   @override
   void dispose() {
@@ -51,13 +72,15 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    final path = '${DateTime.now().millisecondsSinceEpoch}.m4a';
+    final id = DateTime.now().microsecondsSinceEpoch.toString();
+    final path = await _repository.pathForNewRecording('$id.m4a');
     await _recorder.start(const RecordConfig(), path: path);
 
     setState(() {
       _isRecording = true;
       _elapsed = Duration.zero;
       _startedAt = DateTime.now();
+      _currentRecordingId = id;
     });
 
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -67,21 +90,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _stopRecording() async {
     _ticker?.cancel();
-    final path = await _recorder.stop();
+    final recordedPath = await _recorder.stop();
+
+    if (recordedPath != null && _currentRecordingId != null) {
+      final recording = await _repository.finalize(
+        id: _currentRecordingId!,
+        recordedPath: recordedPath,
+        recordedAt: _startedAt!,
+        duration: _elapsed,
+      );
+      _recordings.insert(0, recording);
+      await _repository.save(_recordings);
+    }
 
     setState(() {
       _isRecording = false;
-      if (path != null) {
-        _recordings.insert(
-          0,
-          Recording(
-            id: DateTime.now().microsecondsSinceEpoch.toString(),
-            path: path,
-            recordedAt: DateTime.now(),
-            duration: _elapsed,
-          ),
-        );
-      }
+      _currentRecordingId = null;
     });
   }
 
@@ -92,7 +116,10 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    await _player.play(UrlSource(recording.path));
+    final source = recording.bytes != null
+        ? BytesSource(recording.bytes!)
+        : DeviceFileSource(recording.filePath!);
+    await _player.play(source);
     setState(() => _playingId = recording.id);
     _player.onPlayerComplete.first.then((_) {
       if (mounted) setState(() => _playingId = null);
@@ -146,7 +173,9 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 12),
               Expanded(
-                child: _recordings.isEmpty
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _recordings.isEmpty
                     ? const _EmptyRecordingsState()
                     : ListView.separated(
                         itemCount: _recordings.length,
