@@ -247,21 +247,45 @@ class _HomeScreenState extends State<HomeScreen> {
                         itemBuilder: (context, index) {
                           final recording = _recordings[index];
                           final isPlaying = _playingId == recording.id;
-                          return Card(
-                            child: ListTile(
-                              leading: Icon(
-                                isPlaying
-                                    ? Icons.pause_circle_filled_rounded
-                                    : Icons.play_circle_fill_rounded,
-                                color: AppTheme.accentTeal,
-                                size: 32,
+                          return Dismissible(
+                            key: ValueKey(recording.id),
+                            direction: DismissDirection.endToStart,
+                            confirmDismiss: (_) => _confirmDelete(),
+                            onDismissed: (_) => _deleteRecording(recording),
+                            background: Container(
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
                               ),
-                              title: Text(_formatDuration(recording.duration)),
-                              subtitle: Text(
-                                '${recording.recordedAt.year}-${recording.recordedAt.month.toString().padLeft(2, '0')}-${recording.recordedAt.day.toString().padLeft(2, '0')} '
-                                '${recording.recordedAt.hour.toString().padLeft(2, '0')}:${recording.recordedAt.minute.toString().padLeft(2, '0')}',
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.error,
+                                borderRadius: BorderRadius.circular(
+                                  AppTheme.borderRadius,
+                                ),
                               ),
-                              onTap: () => _playRecording(recording),
+                              child: const Icon(
+                                Icons.delete_rounded,
+                                color: Colors.white,
+                              ),
+                            ),
+                            child: Card(
+                              child: ListTile(
+                                leading: Icon(
+                                  isPlaying
+                                      ? Icons.pause_circle_filled_rounded
+                                      : Icons.play_circle_fill_rounded,
+                                  color: AppTheme.accentTeal,
+                                  size: 32,
+                                ),
+                                title: Text(
+                                  _formatDuration(recording.duration),
+                                ),
+                                subtitle: Text(
+                                  '${recording.recordedAt.year}-${recording.recordedAt.month.toString().padLeft(2, '0')}-${recording.recordedAt.day.toString().padLeft(2, '0')} '
+                                  '${recording.recordedAt.hour.toString().padLeft(2, '0')}:${recording.recordedAt.minute.toString().padLeft(2, '0')}',
+                                ),
+                                onTap: () => _playRecording(recording),
+                              ),
                             ),
                           );
                         },
