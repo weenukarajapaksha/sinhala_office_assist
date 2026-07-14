@@ -16,3 +16,11 @@ Future<String> resolveRecordTarget(String fileName) async {
 /// Files are already persisted on disk at [recordedPath], so there's no
 /// need to duplicate the audio into SharedPreferences on this platform.
 Future<Uint8List?> captureBytes(String recordedPath) async => null;
+
+Future<void> deleteRecordedFile(String? filePath) async {
+  if (filePath == null) return;
+  final file = File(filePath);
+  if (await file.exists()) {
+    await file.delete();
+  }
+}
