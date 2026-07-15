@@ -3,11 +3,10 @@ import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:record/record.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 
 import '../models/recording.dart';
 import '../services/recordings_repository.dart';
-import '../services/settings_repository.dart';
-import '../services/transcription_service.dart';
 import '../theme/app_theme.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -21,16 +20,16 @@ class _HomeScreenState extends State<HomeScreen> {
   final AudioRecorder _recorder = AudioRecorder();
   final AudioPlayer _player = AudioPlayer();
   final RecordingsRepository _repository = RecordingsRepository();
-  final SettingsRepository _settings = SettingsRepository();
-  final GoogleSpeechTranscriber _transcriber = GoogleSpeechTranscriber();
+  final SpeechToText _speechToText = SpeechToText();
   final List<Recording> _recordings = [];
-  final Set<String> _transcribing = {};
 
   bool _isRecording = false;
   bool _isPaused = false;
   bool _isLoading = true;
   bool _busy = false;
+  bool _speechAvailable = false;
   double _level = 0;
+  String _liveTranscript = '';
   Duration _elapsed = Duration.zero;
   Timer? _ticker;
   StreamSubscription<Amplitude>? _amplitudeSub;
@@ -102,6 +101,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _elapsed = Duration.zero;
         _startedAt = DateTime.now();
         _currentRecordingId = id;
+        _liveTranscript = '';
       });
 
       _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -114,6 +114,24 @@ class _HomeScreenState extends State<HomeScreen> {
             if (!mounted) return;
             setState(() => _level = ((amplitude.current + 60) / 60).clamp(0.0, 1.0));
           });
+
+      _speechAvailable = await _speechToText.initialize(
+        onError: (error) => debugPrint('Speech recognition error: $error'),
+      );
+      if (_speechAvailable) {
+        await _speechToText.listen(
+          onResult: (result) {
+            if (!mounted) return;
+            setState(() => _liveTranscript = result.recognizedWords);
+          },
+          listenOptions: SpeechListenOptions(
+            localeId: 'si-LK',
+            listenFor: const Duration(minutes: 10),
+            pauseFor: const Duration(seconds: 30),
+            partialResults: true,
+          ),
+        );
+      }
     } catch (e) {
       debugPrint('Failed to start recording: $e');
       if (mounted) {
@@ -128,6 +146,9 @@ class _HomeScreenState extends State<HomeScreen> {
     _ticker?.cancel();
     await _amplitudeSub?.cancel();
     _amplitudeSub = null;
+    if (_speechAvailable) {
+      await _speechToText.stop();
+    }
     try {
       final recordedPath = await _recorder.stop();
 
@@ -138,7 +159,12 @@ class _HomeScreenState extends State<HomeScreen> {
           recordedAt: _startedAt!,
           duration: _elapsed,
         );
-        _recordings.insert(0, recording);
+        _recordings.insert(
+          0,
+          _liveTranscript.isEmpty
+              ? recording
+              : recording.copyWith(transcript: _liveTranscript),
+        );
         await _repository.save(_recordings);
       }
     } catch (e) {
@@ -271,73 +297,6 @@ class _HomeScreenState extends State<HomeScreen> {
     await _repository.save(_recordings);
   }
 
-  Future<String?> _editApiKey() async {
-    final existing = await _settings.getApiKey();
-    if (!mounted) return null;
-    final controller = TextEditingController(text: existing ?? '');
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Google Speech-to-Text API key'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'Paste your API key'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-
-    if (result == null || result.isEmpty) return null;
-    await _settings.setApiKey(result);
-    return result;
-  }
-
-  Future<void> _transcribeRecording(Recording recording) async {
-    var apiKey = await _settings.getApiKey();
-    if (apiKey == null || apiKey.isEmpty) {
-      apiKey = await _editApiKey();
-      if (apiKey == null) return;
-    }
-
-    setState(() => _transcribing.add(recording.id));
-    try {
-      final bytes = await _repository.audioBytesFor(recording);
-      final transcript = await _transcriber.transcribe(
-        apiKey: apiKey,
-        audioBytes: bytes,
-      );
-      final index = _recordings.indexWhere((r) => r.id == recording.id);
-      if (index != -1) {
-        setState(
-          () => _recordings[index] = recording.copyWith(
-            transcript: transcript,
-          ),
-        );
-        await _repository.save(_recordings);
-      }
-    } catch (e) {
-      debugPrint('Transcription failed: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Transcription failed: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _transcribing.remove(recording.id));
-    }
-  }
-
   String _formatDuration(Duration d) {
     String two(int n) => n.toString().padLeft(2, '0');
     final minutes = two(d.inMinutes.remainder(60));
@@ -350,13 +309,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('සිංහල කාර්යාල සහායක'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.vpn_key_outlined),
-            tooltip: 'Speech-to-Text API key',
-            onPressed: _editApiKey,
-          ),
-        ],
       ),
       body: SafeArea(
         child: Padding(
@@ -395,6 +347,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
+                if (_liveTranscript.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    _liveTranscript,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
                 const SizedBox(height: 16),
                 Row(
                   children: [
@@ -448,9 +407,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         itemBuilder: (context, index) {
                           final recording = _recordings[index];
                           final isPlaying = _playingId == recording.id;
-                          final isTranscribing = _transcribing.contains(
-                            recording.id,
-                          );
                           return Card(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -482,28 +438,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                         onPressed: () =>
                                             _renameRecording(recording),
                                       ),
-                                      isTranscribing
-                                          ? const Padding(
-                                              padding: EdgeInsets.all(12),
-                                              child: SizedBox(
-                                                width: 20,
-                                                height: 20,
-                                                child: CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                ),
-                                              ),
-                                            )
-                                          : IconButton(
-                                              icon: const Icon(
-                                                Icons.text_snippet_outlined,
-                                              ),
-                                              color: AppTheme.textSecondary,
-                                              tooltip: 'Transcribe',
-                                              onPressed: () =>
-                                                  _transcribeRecording(
-                                                    recording,
-                                                  ),
-                                            ),
                                       IconButton(
                                         icon: const Icon(
                                           Icons.delete_outline_rounded,

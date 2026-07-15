@@ -19,11 +19,3 @@ Future<Uint8List?> captureBytes(String recordedPath) async {
 /// so removing the recording from the saved list is enough; there's no
 /// separate file to clean up.
 Future<void> deleteRecordedFile(String? filePath) async {}
-
-/// Recordings on web always carry their bytes inline (see [captureBytes]),
-/// so this is only reached defensively.
-Future<Uint8List> readRecordedFile(String filePath) async {
-  final response = await web.window.fetch(filePath.toJS).toDart;
-  final buffer = await response.arrayBuffer().toDart;
-  return buffer.toDart.asUint8List();
-}

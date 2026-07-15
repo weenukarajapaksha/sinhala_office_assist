@@ -24,5 +24,3 @@ Future<void> deleteRecordedFile(String? filePath) async {
     await file.delete();
   }
 }
-
-Future<Uint8List> readRecordedFile(String filePath) => File(filePath).readAsBytes();
