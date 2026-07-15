@@ -271,6 +271,73 @@ class _HomeScreenState extends State<HomeScreen> {
     await _repository.save(_recordings);
   }
 
+  Future<String?> _editApiKey() async {
+    final existing = await _settings.getApiKey();
+    if (!mounted) return null;
+    final controller = TextEditingController(text: existing ?? '');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Google Speech-to-Text API key'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Paste your API key'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+
+    if (result == null || result.isEmpty) return null;
+    await _settings.setApiKey(result);
+    return result;
+  }
+
+  Future<void> _transcribeRecording(Recording recording) async {
+    var apiKey = await _settings.getApiKey();
+    if (apiKey == null || apiKey.isEmpty) {
+      apiKey = await _editApiKey();
+      if (apiKey == null) return;
+    }
+
+    setState(() => _transcribing.add(recording.id));
+    try {
+      final bytes = await _repository.audioBytesFor(recording);
+      final transcript = await _transcriber.transcribe(
+        apiKey: apiKey,
+        audioBytes: bytes,
+      );
+      final index = _recordings.indexWhere((r) => r.id == recording.id);
+      if (index != -1) {
+        setState(
+          () => _recordings[index] = recording.copyWith(
+            transcript: transcript,
+          ),
+        );
+        await _repository.save(_recordings);
+      }
+    } catch (e) {
+      debugPrint('Transcription failed: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Transcription failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _transcribing.remove(recording.id));
+    }
+  }
+
   String _formatDuration(Duration d) {
     String two(int n) => n.toString().padLeft(2, '0');
     final minutes = two(d.inMinutes.remainder(60));
@@ -283,6 +350,13 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('සිංහල කාර්යාල සහායක'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.vpn_key_outlined),
+            tooltip: 'Speech-to-Text API key',
+            onPressed: _editApiKey,
+          ),
+        ],
       ),
       body: SafeArea(
         child: Padding(
@@ -374,48 +448,94 @@ class _HomeScreenState extends State<HomeScreen> {
                         itemBuilder: (context, index) {
                           final recording = _recordings[index];
                           final isPlaying = _playingId == recording.id;
+                          final isTranscribing = _transcribing.contains(
+                            recording.id,
+                          );
                           return Card(
-                            child: ListTile(
-                              leading: Icon(
-                                isPlaying
-                                    ? Icons.pause_circle_filled_rounded
-                                    : Icons.play_circle_fill_rounded,
-                                color: AppTheme.accentTeal,
-                                size: 32,
-                              ),
-                              title: Text(
-                                recording.title ??
-                                    _formatDuration(recording.duration),
-                              ),
-                              subtitle: Text(
-                                '${recording.recordedAt.year}-${recording.recordedAt.month.toString().padLeft(2, '0')}-${recording.recordedAt.day.toString().padLeft(2, '0')} '
-                                '${recording.recordedAt.hour.toString().padLeft(2, '0')}:${recording.recordedAt.minute.toString().padLeft(2, '0')}'
-                                '${recording.title != null ? ' • ${_formatDuration(recording.duration)}' : ''}',
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.edit_outlined),
-                                    color: AppTheme.textSecondary,
-                                    tooltip: 'Rename',
-                                    onPressed: () => _renameRecording(recording),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                ListTile(
+                                  leading: Icon(
+                                    isPlaying
+                                        ? Icons.pause_circle_filled_rounded
+                                        : Icons.play_circle_fill_rounded,
+                                    color: AppTheme.accentTeal,
+                                    size: 32,
                                   ),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.delete_outline_rounded,
+                                  title: Text(
+                                    recording.title ??
+                                        _formatDuration(recording.duration),
+                                  ),
+                                  subtitle: Text(
+                                    '${recording.recordedAt.year}-${recording.recordedAt.month.toString().padLeft(2, '0')}-${recording.recordedAt.day.toString().padLeft(2, '0')} '
+                                    '${recording.recordedAt.hour.toString().padLeft(2, '0')}:${recording.recordedAt.minute.toString().padLeft(2, '0')}'
+                                    '${recording.title != null ? ' • ${_formatDuration(recording.duration)}' : ''}',
+                                  ),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.edit_outlined),
+                                        color: AppTheme.textSecondary,
+                                        tooltip: 'Rename',
+                                        onPressed: () =>
+                                            _renameRecording(recording),
+                                      ),
+                                      isTranscribing
+                                          ? const Padding(
+                                              padding: EdgeInsets.all(12),
+                                              child: SizedBox(
+                                                width: 20,
+                                                height: 20,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                ),
+                                              ),
+                                            )
+                                          : IconButton(
+                                              icon: const Icon(
+                                                Icons.text_snippet_outlined,
+                                              ),
+                                              color: AppTheme.textSecondary,
+                                              tooltip: 'Transcribe',
+                                              onPressed: () =>
+                                                  _transcribeRecording(
+                                                    recording,
+                                                  ),
+                                            ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.delete_outline_rounded,
+                                        ),
+                                        color: AppTheme.textSecondary,
+                                        tooltip: 'මකන්න',
+                                        onPressed: () async {
+                                          if (await _confirmDelete()) {
+                                            await _deleteRecording(recording);
+                                          }
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                  onTap: () => _playRecording(recording),
+                                ),
+                                if (recording.transcript != null)
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      16,
+                                      0,
+                                      16,
+                                      16,
                                     ),
-                                    color: AppTheme.textSecondary,
-                                    tooltip: 'මකන්න',
-                                    onPressed: () async {
-                                      if (await _confirmDelete()) {
-                                        await _deleteRecording(recording);
-                                      }
-                                    },
+                                    child: Text(
+                                      recording.transcript!,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodyMedium,
+                                    ),
                                   ),
-                                ],
-                              ),
-                              onTap: () => _playRecording(recording),
+                              ],
                             ),
                           );
                         },
