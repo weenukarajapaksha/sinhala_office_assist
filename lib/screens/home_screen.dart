@@ -117,10 +117,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
       _speechAvailable = await _speechToText.initialize(
         onError: (error) => debugPrint('Speech recognition error: $error'),
+        onStatus: (status) => debugPrint('Speech recognition status: $status'),
+        debugLogging: true,
       );
+      debugPrint('Speech recognition available: $_speechAvailable');
       if (_speechAvailable) {
+        final locales = await _speechToText.locales();
+        debugPrint(
+          'Available locales: ${locales.map((l) => l.localeId).where((l) => l.toLowerCase().startsWith('si')).toList()}',
+        );
         await _speechToText.listen(
           onResult: (result) {
+            debugPrint('Speech result: "${result.recognizedWords}" final=${result.finalResult}');
             if (!mounted) return;
             setState(() => _liveTranscript = result.recognizedWords);
           },
