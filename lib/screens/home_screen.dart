@@ -22,10 +22,13 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Recording> _recordings = [];
 
   bool _isRecording = false;
+  bool _isPaused = false;
   bool _isLoading = true;
   bool _busy = false;
+  double _level = 0;
   Duration _elapsed = Duration.zero;
   Timer? _ticker;
+  StreamSubscription<Amplitude>? _amplitudeSub;
   DateTime? _startedAt;
   String? _currentRecordingId;
   String? _playingId;
@@ -50,6 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _ticker?.cancel();
+    _amplitudeSub?.cancel();
     _recorder.dispose();
     _player.dispose();
     super.dispose();
