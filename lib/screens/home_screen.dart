@@ -6,6 +6,8 @@ import 'package:record/record.dart';
 
 import '../models/recording.dart';
 import '../services/recordings_repository.dart';
+import '../services/settings_repository.dart';
+import '../services/transcription_service.dart';
 import '../theme/app_theme.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -19,7 +21,10 @@ class _HomeScreenState extends State<HomeScreen> {
   final AudioRecorder _recorder = AudioRecorder();
   final AudioPlayer _player = AudioPlayer();
   final RecordingsRepository _repository = RecordingsRepository();
+  final SettingsRepository _settings = SettingsRepository();
+  final GoogleSpeechTranscriber _transcriber = GoogleSpeechTranscriber();
   final List<Recording> _recordings = [];
+  final Set<String> _transcribing = {};
 
   bool _isRecording = false;
   bool _isPaused = false;
