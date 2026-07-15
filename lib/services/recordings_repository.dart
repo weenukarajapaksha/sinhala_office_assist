@@ -56,6 +56,7 @@ class RecordingsRepository {
             'durationMs': r.duration.inMilliseconds,
             if (r.filePath != null) 'filePath': r.filePath,
             if (r.bytes != null) 'audioBase64': base64Encode(r.bytes!),
+            if (r.title != null) 'title': r.title,
           }),
         )
         .toList();

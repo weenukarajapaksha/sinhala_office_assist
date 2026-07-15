@@ -229,6 +229,43 @@ class _HomeScreenState extends State<HomeScreen> {
     await _repository.delete(recording);
   }
 
+  Future<void> _renameRecording(Recording recording) async {
+    final controller = TextEditingController(
+      text: recording.title ?? _formatDuration(recording.duration),
+    );
+    final newTitle = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Rename recording'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Recording name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+
+    if (newTitle == null || newTitle.isEmpty) return;
+
+    final index = _recordings.indexWhere((r) => r.id == recording.id);
+    if (index == -1) return;
+    setState(() {
+      _recordings[index] = recording.copyWith(title: newTitle);
+    });
+    await _repository.save(_recordings);
+  }
+
   String _formatDuration(Duration d) {
     String two(int n) => n.toString().padLeft(2, '0');
     final minutes = two(d.inMinutes.remainder(60));
@@ -341,20 +378,37 @@ class _HomeScreenState extends State<HomeScreen> {
                                 color: AppTheme.accentTeal,
                                 size: 32,
                               ),
-                              title: Text(_formatDuration(recording.duration)),
+                              title: Text(
+                                recording.title ??
+                                    _formatDuration(recording.duration),
+                              ),
                               subtitle: Text(
                                 '${recording.recordedAt.year}-${recording.recordedAt.month.toString().padLeft(2, '0')}-${recording.recordedAt.day.toString().padLeft(2, '0')} '
-                                '${recording.recordedAt.hour.toString().padLeft(2, '0')}:${recording.recordedAt.minute.toString().padLeft(2, '0')}',
+                                '${recording.recordedAt.hour.toString().padLeft(2, '0')}:${recording.recordedAt.minute.toString().padLeft(2, '0')}'
+                                '${recording.title != null ? ' • ${_formatDuration(recording.duration)}' : ''}',
                               ),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.delete_outline_rounded),
-                                color: AppTheme.textSecondary,
-                                tooltip: 'මකන්න',
-                                onPressed: () async {
-                                  if (await _confirmDelete()) {
-                                    await _deleteRecording(recording);
-                                  }
-                                },
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.edit_outlined),
+                                    color: AppTheme.textSecondary,
+                                    tooltip: 'Rename',
+                                    onPressed: () => _renameRecording(recording),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.delete_outline_rounded,
+                                    ),
+                                    color: AppTheme.textSecondary,
+                                    tooltip: 'මකන්න',
+                                    onPressed: () async {
+                                      if (await _confirmDelete()) {
+                                        await _deleteRecording(recording);
+                                      }
+                                    },
+                                  ),
+                                ],
                               ),
                               onTap: () => _playRecording(recording),
                             ),
