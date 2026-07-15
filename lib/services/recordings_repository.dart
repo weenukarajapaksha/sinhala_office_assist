@@ -39,6 +39,7 @@ class RecordingsRepository {
         duration: Duration(milliseconds: map['durationMs'] as int),
         filePath: map['filePath'] as String?,
         bytes: audioBase64 != null ? base64Decode(audioBase64) : null,
+        title: map['title'] as String?,
       );
     }).toList();
   }

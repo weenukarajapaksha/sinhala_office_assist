@@ -248,27 +248,73 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _toggleRecording,
-                  style: _isRecording
-                      ? ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.error,
-                        )
-                      : null,
-                  icon: Icon(
-                    _isRecording
-                        ? Icons.stop_rounded
-                        : Icons.mic_none_rounded,
-                  ),
-                  label: Text(
-                    _isRecording
-                        ? 'පටිගත කරමින් • ${_formatDuration(_elapsed)}'
-                        : 'නව පටිගත කිරීමක්',
+              if (_isRecording) ...[
+                Row(
+                  children: [
+                    Icon(
+                      Icons.fiber_manual_record_rounded,
+                      size: 14,
+                      color: _isPaused
+                          ? AppTheme.textSecondary
+                          : Theme.of(context).colorScheme.error,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _isPaused
+                          ? 'විරාමයි • ${_formatDuration(_elapsed)}'
+                          : 'පටිගත කරමින් • ${_formatDuration(_elapsed)}',
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: _isPaused ? 0 : _level,
+                    minHeight: 6,
+                    backgroundColor: AppTheme.divider,
+                    valueColor: const AlwaysStoppedAnimation(
+                      AppTheme.accentTeal,
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _togglePause,
+                        icon: Icon(
+                          _isPaused
+                              ? Icons.play_arrow_rounded
+                              : Icons.pause_rounded,
+                        ),
+                        label: Text(_isPaused ? 'දිගටම කරගෙන යන්න' : 'විරාමය'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _toggleRecording,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).colorScheme.error,
+                        ),
+                        icon: const Icon(Icons.stop_rounded),
+                        label: const Text('නවත්වන්න'),
+                      ),
+                    ),
+                  ],
+                ),
+              ] else
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _toggleRecording,
+                    icon: const Icon(Icons.mic_none_rounded),
+                    label: const Text('නව පටිගත කිරීමක්'),
+                  ),
+                ),
               const SizedBox(height: 28),
               Text(
                 'පෙර පටිගත කිරීම්',
