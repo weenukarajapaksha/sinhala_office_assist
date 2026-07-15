@@ -93,6 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       setState(() {
         _isRecording = true;
+        _isPaused = false;
         _elapsed = Duration.zero;
         _startedAt = DateTime.now();
         _currentRecordingId = id;
@@ -101,6 +102,13 @@ class _HomeScreenState extends State<HomeScreen> {
       _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
         setState(() => _elapsed = DateTime.now().difference(_startedAt!));
       });
+
+      _amplitudeSub = _recorder
+          .onAmplitudeChanged(const Duration(milliseconds: 200))
+          .listen((amplitude) {
+            if (!mounted) return;
+            setState(() => _level = ((amplitude.current + 60) / 60).clamp(0.0, 1.0));
+          });
     } catch (e) {
       debugPrint('Failed to start recording: $e');
       if (mounted) {
@@ -113,6 +121,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _stopRecording() async {
     _ticker?.cancel();
+    await _amplitudeSub?.cancel();
+    _amplitudeSub = null;
     try {
       final recordedPath = await _recorder.stop();
 
@@ -137,8 +147,33 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() {
       _isRecording = false;
+      _isPaused = false;
       _currentRecordingId = null;
+      _level = 0;
     });
+  }
+
+  Future<void> _togglePause() async {
+    if (_busy) return;
+    _busy = true;
+    try {
+      if (_isPaused) {
+        await _recorder.resume();
+        _startedAt = DateTime.now().subtract(_elapsed);
+        _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+          setState(() => _elapsed = DateTime.now().difference(_startedAt!));
+        });
+        setState(() => _isPaused = false);
+      } else {
+        _ticker?.cancel();
+        await _recorder.pause();
+        setState(() => _isPaused = true);
+      }
+    } catch (e) {
+      debugPrint('Failed to toggle pause: $e');
+    } finally {
+      _busy = false;
+    }
   }
 
   Future<void> _playRecording(Recording recording) async {
