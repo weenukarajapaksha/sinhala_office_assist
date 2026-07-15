@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -40,11 +41,18 @@ class RecordingsRepository {
         filePath: map['filePath'] as String?,
         bytes: audioBase64 != null ? base64Decode(audioBase64) : null,
         title: map['title'] as String?,
+        transcript: map['transcript'] as String?,
       );
     }).toList();
   }
 
   Future<void> delete(Recording recording) => deleteRecordedFile(recording.filePath);
+
+  /// Raw audio bytes for [recording], for uploading to a transcription API.
+  Future<Uint8List> audioBytesFor(Recording recording) async {
+    if (recording.bytes != null) return recording.bytes!;
+    return readRecordedFile(recording.filePath!);
+  }
 
   Future<void> save(List<Recording> recordings) async {
     final prefs = await SharedPreferences.getInstance();

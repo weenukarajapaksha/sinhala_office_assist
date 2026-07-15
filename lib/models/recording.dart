@@ -8,6 +8,7 @@ class Recording {
     this.filePath,
     this.bytes,
     this.title,
+    this.transcript,
   }) : assert(filePath != null || bytes != null);
 
   final String id;
@@ -24,12 +25,16 @@ class Recording {
   /// User-assigned name; falls back to a formatted duration/timestamp when null.
   final String? title;
 
-  Recording copyWith({String? title}) => Recording(
+  /// Sinhala transcript from cloud speech-to-text, if generated.
+  final String? transcript;
+
+  Recording copyWith({String? title, String? transcript}) => Recording(
     id: id,
     recordedAt: recordedAt,
     duration: duration,
     filePath: filePath,
     bytes: bytes,
     title: title ?? this.title,
+    transcript: transcript ?? this.transcript,
   );
 }
