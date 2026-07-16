@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../models/recording.dart';
+
 Future<String> resolveRecordTarget(String fileName) async {
   final docs = await getApplicationDocumentsDirectory();
   final dir = Directory(p.join(docs.path, 'recordings'));
@@ -24,3 +26,6 @@ Future<void> deleteRecordedFile(String? filePath) async {
     await file.delete();
   }
 }
+
+Future<Uint8List> readAudioBytes(Recording recording) async =>
+    recording.bytes ?? await File(recording.filePath!).readAsBytes();

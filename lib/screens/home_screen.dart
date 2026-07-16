@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:record/record.dart';
-import 'package:speech_to_text/speech_to_text.dart';
 
 import '../models/recording.dart';
+import '../services/audio_storage.dart';
+import '../services/gemini_transcription_service.dart';
 import '../services/recordings_repository.dart';
+import '../services/settings_repository.dart';
 import '../theme/app_theme.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -20,16 +22,17 @@ class _HomeScreenState extends State<HomeScreen> {
   final AudioRecorder _recorder = AudioRecorder();
   final AudioPlayer _player = AudioPlayer();
   final RecordingsRepository _repository = RecordingsRepository();
-  final SpeechToText _speechToText = SpeechToText();
+  final SettingsRepository _settings = SettingsRepository();
+  final GeminiTranscriptionService _transcriptionService =
+      GeminiTranscriptionService();
   final List<Recording> _recordings = [];
+  final Set<String> _transcribingIds = {};
 
   bool _isRecording = false;
   bool _isPaused = false;
   bool _isLoading = true;
   bool _busy = false;
-  bool _speechAvailable = false;
   double _level = 0;
-  String _liveTranscript = '';
   Duration _elapsed = Duration.zero;
   Timer? _ticker;
   StreamSubscription<Amplitude>? _amplitudeSub;

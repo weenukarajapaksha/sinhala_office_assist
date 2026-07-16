@@ -3,6 +3,8 @@ import 'dart:typed_data';
 
 import 'package:web/web.dart' as web;
 
+import '../models/recording.dart';
+
 /// `record` ignores the path on web, so there's nothing to resolve.
 Future<String> resolveRecordTarget(String fileName) async => fileName;
 
@@ -19,3 +21,6 @@ Future<Uint8List?> captureBytes(String recordedPath) async {
 /// so removing the recording from the saved list is enough; there's no
 /// separate file to clean up.
 Future<void> deleteRecordedFile(String? filePath) async {}
+
+Future<Uint8List> readAudioBytes(Recording recording) async =>
+    recording.bytes!;
