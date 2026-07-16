@@ -2,12 +2,15 @@ import 'dart:async';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import 'package:printing/printing.dart';
 import 'package:record/record.dart';
 
 import '../models/recording.dart';
 import '../services/audio_storage.dart';
 import '../services/gemini_transcription_service.dart';
 import '../services/recordings_repository.dart';
+import '../services/session_report_service.dart';
 import '../services/settings_repository.dart';
 import '../theme/app_theme.dart';
 
@@ -25,13 +28,17 @@ class _HomeScreenState extends State<HomeScreen> {
   final SettingsRepository _settings = SettingsRepository();
   final GeminiTranscriptionService _transcriptionService =
       GeminiTranscriptionService();
+  final SessionReportService _reportService = SessionReportService();
   final List<Recording> _recordings = [];
   final Set<String> _transcribingIds = {};
+  final Set<String> _selectedIds = {};
 
   bool _isRecording = false;
   bool _isPaused = false;
   bool _isLoading = true;
   bool _busy = false;
+  bool _selectionMode = false;
+  bool _generatingReport = false;
   double _level = 0;
   Duration _elapsed = Duration.zero;
   Timer? _ticker;
@@ -239,6 +246,109 @@ class _HomeScreenState extends State<HomeScreen> {
     await _settings.saveGeminiApiKey(saved);
   }
 
+  Future<void> _copyTranscript(String transcript) async {
+    await Clipboard.setData(ClipboardData(text: transcript));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('පිටපත් කරන ලදී')),
+      );
+    }
+  }
+
+  void _enterSelectionMode(String id) {
+    setState(() {
+      _selectionMode = true;
+      _selectedIds
+        ..clear()
+        ..add(id);
+    });
+  }
+
+  void _exitSelectionMode() {
+    setState(() {
+      _selectionMode = false;
+      _selectedIds.clear();
+    });
+  }
+
+  void _toggleSelection(String id) {
+    setState(() {
+      if (_selectedIds.contains(id)) {
+        _selectedIds.remove(id);
+      } else {
+        _selectedIds.add(id);
+      }
+    });
+  }
+
+  Future<void> _generateReport() async {
+    final apiKey = await _settings.getGeminiApiKey();
+    if (apiKey == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'වාර්තාවක් සකසන්න Gemini API key එකක් සකසන්න (සැකසුම්)',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    final selected =
+        _recordings
+            .where(
+              (r) =>
+                  _selectedIds.contains(r.id) &&
+                  r.transcript != null &&
+                  r.transcript!.isNotEmpty,
+            )
+            .toList()
+          ..sort((a, b) => a.recordedAt.compareTo(b.recordedAt));
+
+    if (selected.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('තෝරාගත් පටිගත කිරීම්වල පිටපත් නොමැත'),
+          ),
+        );
+      }
+      return;
+    }
+
+    setState(() => _generatingReport = true);
+    try {
+      final summary = await _reportService.generateSummary(
+        apiKey: apiKey,
+        recordings: selected,
+      );
+      final pdfBytes = await _reportService.buildPdf(
+        summary: summary,
+        recordings: selected,
+      );
+      await Printing.sharePdf(
+        bytes: pdfBytes,
+        filename: 'session-report-${DateTime.now().millisecondsSinceEpoch}.pdf',
+      );
+      if (mounted) {
+        _exitSelectionMode();
+      }
+    } catch (e) {
+      debugPrint('Failed to generate report: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('වාර්තාව සකසීම අසාර්ථකයි: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _generatingReport = false);
+      }
+    }
+  }
+
   Future<void> _togglePause() async {
     if (_busy) return;
     _busy = true;
@@ -362,16 +472,53 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('සිංහල කාර්යාල සහායක'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.key_outlined),
-            tooltip: 'Gemini API Key',
-            onPressed: _showApiKeyDialog,
-          ),
-        ],
-      ),
+      appBar: _selectionMode
+          ? AppBar(
+              leading: IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: _generatingReport ? null : _exitSelectionMode,
+              ),
+              title: Text('${_selectedIds.length} තෝරා ඇත'),
+              actions: [
+                if (_generatingReport)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  IconButton(
+                    icon: const Icon(Icons.picture_as_pdf_outlined),
+                    tooltip: 'වාර්තාව ලබාගන්න',
+                    onPressed: _selectedIds.isEmpty ? null : _generateReport,
+                  ),
+              ],
+            )
+          : AppBar(
+              title: const Text('සිංහල කාර්යාල සහායක'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.checklist_rounded),
+                  tooltip: 'වාර්තාවක් සකසන්න',
+                  onPressed: _recordings.isEmpty
+                      ? null
+                      : () => setState(() => _selectionMode = true),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.key_outlined),
+                  tooltip: 'Gemini API Key',
+                  onPressed: _showApiKeyDialog,
+                ),
+              ],
+            ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),
@@ -462,18 +609,27 @@ class _HomeScreenState extends State<HomeScreen> {
                         itemBuilder: (context, index) {
                           final recording = _recordings[index];
                           final isPlaying = _playingId == recording.id;
+                          final isSelected = _selectedIds.contains(
+                            recording.id,
+                          );
                           return Card(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 ListTile(
-                                  leading: Icon(
-                                    isPlaying
-                                        ? Icons.pause_circle_filled_rounded
-                                        : Icons.play_circle_fill_rounded,
-                                    color: AppTheme.accentTeal,
-                                    size: 32,
-                                  ),
+                                  leading: _selectionMode
+                                      ? Checkbox(
+                                          value: isSelected,
+                                          onChanged: (_) =>
+                                              _toggleSelection(recording.id),
+                                        )
+                                      : Icon(
+                                          isPlaying
+                                              ? Icons.pause_circle_filled_rounded
+                                              : Icons.play_circle_fill_rounded,
+                                          color: AppTheme.accentTeal,
+                                          size: 32,
+                                        ),
                                   title: Text(
                                     recording.title ??
                                         _formatDuration(recording.duration),
@@ -483,31 +639,44 @@ class _HomeScreenState extends State<HomeScreen> {
                                     '${recording.recordedAt.hour.toString().padLeft(2, '0')}:${recording.recordedAt.minute.toString().padLeft(2, '0')}'
                                     '${recording.title != null ? ' • ${_formatDuration(recording.duration)}' : ''}',
                                   ),
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.edit_outlined),
-                                        color: AppTheme.textSecondary,
-                                        tooltip: 'Rename',
-                                        onPressed: () =>
-                                            _renameRecording(recording),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.delete_outline_rounded,
+                                  trailing: _selectionMode
+                                      ? null
+                                      : Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            IconButton(
+                                              icon: const Icon(
+                                                Icons.edit_outlined,
+                                              ),
+                                              color: AppTheme.textSecondary,
+                                              tooltip: 'Rename',
+                                              onPressed: () =>
+                                                  _renameRecording(recording),
+                                            ),
+                                            IconButton(
+                                              icon: const Icon(
+                                                Icons.delete_outline_rounded,
+                                              ),
+                                              color: AppTheme.textSecondary,
+                                              tooltip: 'මකන්න',
+                                              onPressed: () async {
+                                                if (await _confirmDelete()) {
+                                                  await _deleteRecording(
+                                                    recording,
+                                                  );
+                                                }
+                                              },
+                                            ),
+                                          ],
                                         ),
-                                        color: AppTheme.textSecondary,
-                                        tooltip: 'මකන්න',
-                                        onPressed: () async {
-                                          if (await _confirmDelete()) {
-                                            await _deleteRecording(recording);
-                                          }
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                  onTap: () => _playRecording(recording),
+                                  onTap: _selectionMode
+                                      ? () => _toggleSelection(recording.id)
+                                      : () => _playRecording(recording),
+                                  onLongPress: _selectionMode
+                                      ? null
+                                      : () => _enterSelectionMode(
+                                          recording.id,
+                                        ),
                                 ),
                                 if (_transcribingIds.contains(recording.id))
                                   const Padding(
@@ -535,11 +704,30 @@ class _HomeScreenState extends State<HomeScreen> {
                                       16,
                                       16,
                                     ),
-                                    child: Text(
-                                      recording.transcript!,
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.bodyMedium,
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            recording.transcript!,
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.bodyMedium,
+                                          ),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.copy_outlined,
+                                            size: 18,
+                                          ),
+                                          color: AppTheme.textSecondary,
+                                          tooltip: 'පිටපත් කරන්න',
+                                          onPressed: () => _copyTranscript(
+                                            recording.transcript!,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                               ],
