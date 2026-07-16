@@ -104,7 +104,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _elapsed = Duration.zero;
         _startedAt = DateTime.now();
         _currentRecordingId = id;
-        _liveTranscript = '';
       });
 
       _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -117,32 +116,6 @@ class _HomeScreenState extends State<HomeScreen> {
             if (!mounted) return;
             setState(() => _level = ((amplitude.current + 60) / 60).clamp(0.0, 1.0));
           });
-
-      _speechAvailable = await _speechToText.initialize(
-        onError: (error) => debugPrint('Speech recognition error: $error'),
-        onStatus: (status) => debugPrint('Speech recognition status: $status'),
-        debugLogging: true,
-      );
-      debugPrint('Speech recognition available: $_speechAvailable');
-      if (_speechAvailable) {
-        final locales = await _speechToText.locales();
-        debugPrint(
-          'Available locales: ${locales.map((l) => l.localeId).where((l) => l.toLowerCase().startsWith('si')).toList()}',
-        );
-        await _speechToText.listen(
-          onResult: (result) {
-            debugPrint('Speech result: "${result.recognizedWords}" final=${result.finalResult}');
-            if (!mounted) return;
-            setState(() => _liveTranscript = result.recognizedWords);
-          },
-          listenOptions: SpeechListenOptions(
-            localeId: 'si-LK',
-            listenFor: const Duration(minutes: 10),
-            pauseFor: const Duration(seconds: 30),
-            partialResults: true,
-          ),
-        );
-      }
     } catch (e) {
       debugPrint('Failed to start recording: $e');
       if (mounted) {
@@ -157,9 +130,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _ticker?.cancel();
     await _amplitudeSub?.cancel();
     _amplitudeSub = null;
-    if (_speechAvailable) {
-      await _speechToText.stop();
-    }
     try {
       final recordedPath = await _recorder.stop();
 
@@ -170,13 +140,9 @@ class _HomeScreenState extends State<HomeScreen> {
           recordedAt: _startedAt!,
           duration: _elapsed,
         );
-        _recordings.insert(
-          0,
-          _liveTranscript.isEmpty
-              ? recording
-              : recording.copyWith(transcript: _liveTranscript),
-        );
+        _recordings.insert(0, recording);
         await _repository.save(_recordings);
+        unawaited(_transcribeRecording(recording));
       }
     } catch (e) {
       debugPrint('Failed to stop/save recording: $e');
@@ -193,6 +159,84 @@ class _HomeScreenState extends State<HomeScreen> {
       _currentRecordingId = null;
       _level = 0;
     });
+  }
+
+  Future<void> _transcribeRecording(Recording recording) async {
+    final apiKey = await _settings.getGeminiApiKey();
+    if (apiKey == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'පෙළට හැරවීමට Gemini API key එකක් සකසන්න (සැකසුම්)',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    setState(() => _transcribingIds.add(recording.id));
+    try {
+      final audioBytes = await readAudioBytes(recording);
+      final transcript = await _transcriptionService.transcribe(
+        apiKey: apiKey,
+        audioBytes: audioBytes,
+      );
+      final index = _recordings.indexWhere((r) => r.id == recording.id);
+      if (index != -1) {
+        setState(() {
+          _recordings[index] = _recordings[index].copyWith(
+            transcript: transcript,
+          );
+        });
+        await _repository.save(_recordings);
+      }
+    } catch (e) {
+      debugPrint('Failed to transcribe recording: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('පෙළට හැරවීම අසාර්ථකයි: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _transcribingIds.remove(recording.id));
+      }
+    }
+  }
+
+  Future<void> _showApiKeyDialog() async {
+    final controller = TextEditingController(
+      text: await _settings.getGeminiApiKey() ?? '',
+    );
+    if (!mounted) return;
+    final saved = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Gemini API Key'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          obscureText: true,
+          decoration: const InputDecoration(hintText: 'API key'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+
+    if (saved == null || saved.isEmpty) return;
+    await _settings.saveGeminiApiKey(saved);
   }
 
   Future<void> _togglePause() async {
@@ -320,6 +364,13 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('සිංහල කාර්යාල සහායක'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.key_outlined),
+            tooltip: 'Gemini API Key',
+            onPressed: _showApiKeyDialog,
+          ),
+        ],
       ),
       body: SafeArea(
         child: Padding(
@@ -358,13 +409,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-                if (_liveTranscript.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    _liveTranscript,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
                 const SizedBox(height: 16),
                 Row(
                   children: [
@@ -465,7 +509,25 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                   onTap: () => _playRecording(recording),
                                 ),
-                                if (recording.transcript != null)
+                                if (_transcribingIds.contains(recording.id))
+                                  const Padding(
+                                    padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        SizedBox(
+                                          width: 14,
+                                          height: 14,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text('පෙළට හරවමින්...'),
+                                      ],
+                                    ),
+                                  )
+                                else if (recording.transcript != null)
                                   Padding(
                                     padding: const EdgeInsets.fromLTRB(
                                       16,
