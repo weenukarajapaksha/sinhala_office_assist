@@ -7,15 +7,20 @@ import 'package:printing/printing.dart';
 import 'package:record/record.dart';
 
 import '../models/recording.dart';
+import '../models/scanned_document.dart';
 import '../services/audio_storage.dart';
+import '../services/documents_repository.dart';
 import '../services/gemini_transcription_service.dart';
 import '../services/recordings_repository.dart';
 import '../services/session_report_service.dart';
+import '../services/session_selection_controller.dart';
 import '../services/settings_repository.dart';
 import '../theme/app_theme.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({required this.selectionController, super.key});
+
+  final SessionSelectionController selectionController;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -25,19 +30,18 @@ class _HomeScreenState extends State<HomeScreen> {
   final AudioRecorder _recorder = AudioRecorder();
   final AudioPlayer _player = AudioPlayer();
   final RecordingsRepository _repository = RecordingsRepository();
+  final DocumentsRepository _documentsRepository = DocumentsRepository();
   final SettingsRepository _settings = SettingsRepository();
   final GeminiTranscriptionService _transcriptionService =
       GeminiTranscriptionService();
   final SessionReportService _reportService = SessionReportService();
   final List<Recording> _recordings = [];
   final Set<String> _transcribingIds = {};
-  final Set<String> _selectedIds = {};
 
   bool _isRecording = false;
   bool _isPaused = false;
   bool _isLoading = true;
   bool _busy = false;
-  bool _selectionMode = false;
   bool _generatingReport = false;
   double _level = 0;
   Duration _elapsed = Duration.zero;

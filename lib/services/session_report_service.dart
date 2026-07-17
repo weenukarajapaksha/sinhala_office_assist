@@ -7,6 +7,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import '../models/recording.dart';
+import '../models/scanned_document.dart';
 
 class SessionReportException implements Exception {
   SessionReportException(this.message);
@@ -16,21 +17,33 @@ class SessionReportException implements Exception {
   String toString() => message;
 }
 
-/// Summarizes a group of recordings' transcripts via Gemini, then renders
-/// the summary plus full transcripts into a downloadable PDF.
+/// Summarizes a group of recordings' transcripts and scanned documents'
+/// extracted text via Gemini, then renders the summary plus full source
+/// text into a downloadable PDF.
 class SessionReportService {
   static const _model = 'gemini-3.5-flash';
 
   Future<String> generateSummary({
     required String apiKey,
-    required List<Recording> recordings,
+    List<Recording> recordings = const [],
+    List<ScannedDocument> documents = const [],
   }) async {
     final transcriptSection = recordings
         .map(
           (r) =>
-              '### ${r.title ?? r.id} (${_formatDateTime(r.recordedAt)})\n${r.transcript ?? ''}',
+              '### පටිගත කිරීම: ${r.title ?? r.id} (${_formatDateTime(r.recordedAt)})\n${r.transcript ?? ''}',
         )
         .join('\n\n');
+    final documentSection = documents
+        .map(
+          (d) =>
+              '### ලේඛනය: ${d.title ?? d.id} (${_formatDateTime(d.scannedAt)})\n${d.extractedText ?? ''}',
+        )
+        .join('\n\n');
+    final sourceSection = [
+      transcriptSection,
+      documentSection,
+    ].where((s) => s.isNotEmpty).join('\n\n');
 
     final uri = Uri.parse(
       'https://generativelanguage.googleapis.com/v1beta/models/$_model:generateContent?key=$apiKey',
@@ -45,10 +58,11 @@ class SessionReportService {
             'parts': [
               {
                 'text':
-                    'පහත දැක්වෙන්නේ එක් සැසියක කොටස් කිහිපයක සිංහල පිටපත් (transcripts) කිහිපයකි. '
+                    'පහත දැක්වෙන්නේ එක් සැසියක පටිගත කිරීම්වල සිංහල පිටපත් (transcripts) සහ/හෝ '
+                    'ලේඛනවලින් උපුටාගත් පෙළ කිහිපයකි. '
                     'මේවා පදනම් කරගෙන සිංහල භාෂාවෙන් සංක්ෂිප්ත වාර්තාවක් සකසන්න. '
                     'වාර්තාවේ මේ කොටස් තිබිය යුතුය: "සාරාංශය", "ප්‍රධාන කරුණු", "තීරණ", "ඉදිරි කටයුතු". '
-                    'පිටපත්වල නොමැති අමතර අදහස්, පරිවර්තන හෝ ඉංග්‍රීසි වචන එක් නොකරන්න.\n\n$transcriptSection',
+                    'මූලාශ්‍රවල නොමැති අමතර අදහස්, පරිවර්තන හෝ ඉංග්‍රීසි වචන එක් නොකරන්න.\n\n$sourceSection',
               },
             ],
           },
@@ -77,7 +91,8 @@ class SessionReportService {
 
   Future<Uint8List> buildPdf({
     required String summary,
-    required List<Recording> recordings,
+    List<Recording> recordings = const [],
+    List<ScannedDocument> documents = const [],
   }) async {
     final fontData = await rootBundle.load(
       'assets/fonts/NotoSansSinhala-VariableFont.ttf',
@@ -101,39 +116,76 @@ class SessionReportService {
             'සකස් කළේ: ${_formatDateTime(DateTime.now())}',
             style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
           ),
-          pw.SizedBox(height: 16),
-          pw.Text(
-            'ඇතුළත් පටිගත කිරීම්',
-            style: const pw.TextStyle(fontSize: 14),
-          ),
-          pw.SizedBox(height: 6),
-          ...recordings.map(
-            (r) => pw.Padding(
-              padding: const pw.EdgeInsets.only(bottom: 4),
-              child: pw.Text(
-                '• ${r.title ?? r.id} — ${_formatDateTime(r.recordedAt)} (${_formatDuration(r.duration)})',
-                style: const pw.TextStyle(fontSize: 11),
+          if (recordings.isNotEmpty) ...[
+            pw.SizedBox(height: 16),
+            pw.Text(
+              'ඇතුළත් පටිගත කිරීම්',
+              style: const pw.TextStyle(fontSize: 14),
+            ),
+            pw.SizedBox(height: 6),
+            ...recordings.map(
+              (r) => pw.Padding(
+                padding: const pw.EdgeInsets.only(bottom: 4),
+                child: pw.Text(
+                  '• ${r.title ?? r.id} — ${_formatDateTime(r.recordedAt)} (${_formatDuration(r.duration)})',
+                  style: const pw.TextStyle(fontSize: 11),
+                ),
               ),
             ),
-          ),
+          ],
+          if (documents.isNotEmpty) ...[
+            pw.SizedBox(height: 16),
+            pw.Text('ඇතුළත් ලේඛන', style: const pw.TextStyle(fontSize: 14)),
+            pw.SizedBox(height: 6),
+            ...documents.map(
+              (d) => pw.Padding(
+                padding: const pw.EdgeInsets.only(bottom: 4),
+                child: pw.Text(
+                  '• ${d.title ?? d.id} — ${_formatDateTime(d.scannedAt)}',
+                  style: const pw.TextStyle(fontSize: 11),
+                ),
+              ),
+            ),
+          ],
           pw.SizedBox(height: 16),
           pw.Text('සාරාංශය', style: const pw.TextStyle(fontSize: 14)),
           pw.SizedBox(height: 6),
           pw.Text(summary, style: const pw.TextStyle(fontSize: 11)),
-          pw.SizedBox(height: 20),
-          pw.Text('සම්පූර්ණ පිටපත්', style: const pw.TextStyle(fontSize: 14)),
-          pw.SizedBox(height: 6),
-          ...recordings.expand(
-            (r) => [
-              pw.Text(
-                r.title ?? r.id,
-                style: const pw.TextStyle(fontSize: 12),
-              ),
-              pw.SizedBox(height: 4),
-              pw.Text(r.transcript ?? '', style: const pw.TextStyle(fontSize: 10)),
-              pw.SizedBox(height: 14),
-            ],
-          ),
+          if (recordings.isNotEmpty) ...[
+            pw.SizedBox(height: 20),
+            pw.Text('සම්පූර්ණ පිටපත්', style: const pw.TextStyle(fontSize: 14)),
+            pw.SizedBox(height: 6),
+            ...recordings.expand(
+              (r) => [
+                pw.Text(r.title ?? r.id, style: const pw.TextStyle(fontSize: 12)),
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  r.transcript ?? '',
+                  style: const pw.TextStyle(fontSize: 10),
+                ),
+                pw.SizedBox(height: 14),
+              ],
+            ),
+          ],
+          if (documents.isNotEmpty) ...[
+            pw.SizedBox(height: 20),
+            pw.Text(
+              'ලේඛනවල සම්පූර්ණ පෙළ',
+              style: const pw.TextStyle(fontSize: 14),
+            ),
+            pw.SizedBox(height: 6),
+            ...documents.expand(
+              (d) => [
+                pw.Text(d.title ?? d.id, style: const pw.TextStyle(fontSize: 12)),
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  d.extractedText ?? '',
+                  style: const pw.TextStyle(fontSize: 10),
+                ),
+                pw.SizedBox(height: 14),
+              ],
+            ),
+          ],
         ],
       ),
     );
