@@ -718,6 +718,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                         ),
                                         IconButton(
                                           icon: const Icon(
+                                            Icons.refresh_rounded,
+                                            size: 18,
+                                          ),
+                                          color: AppTheme.textSecondary,
+                                          tooltip: 'නැවත පෙළට හරවන්න',
+                                          onPressed: () =>
+                                              _transcribeRecording(recording),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(
                                             Icons.copy_outlined,
                                             size: 18,
                                           ),
@@ -728,6 +738,27 @@ class _HomeScreenState extends State<HomeScreen> {
                                           ),
                                         ),
                                       ],
+                                    ),
+                                  )
+                                else
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      16,
+                                      0,
+                                      16,
+                                      16,
+                                    ),
+                                    child: Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: TextButton.icon(
+                                        onPressed: () =>
+                                            _transcribeRecording(recording),
+                                        icon: const Icon(
+                                          Icons.refresh_rounded,
+                                          size: 18,
+                                        ),
+                                        label: const Text('පෙළට හරවන්න'),
+                                      ),
                                     ),
                                   ),
                               ],
