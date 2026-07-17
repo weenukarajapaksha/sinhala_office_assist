@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/session_selection_controller.dart';
 import 'documents_screen.dart';
 import 'home_screen.dart';
 
@@ -11,9 +12,20 @@ class RootScreen extends StatefulWidget {
 }
 
 class _RootScreenState extends State<RootScreen> {
+  final SessionSelectionController _selectionController =
+      SessionSelectionController();
   int _index = 0;
 
-  static const _screens = [HomeScreen(), DocumentsScreen()];
+  late final List<Widget> _screens = [
+    HomeScreen(selectionController: _selectionController),
+    DocumentsScreen(selectionController: _selectionController),
+  ];
+
+  @override
+  void dispose() {
+    _selectionController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

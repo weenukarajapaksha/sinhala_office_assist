@@ -7,7 +7,6 @@ import 'package:printing/printing.dart';
 import 'package:record/record.dart';
 
 import '../models/recording.dart';
-import '../models/scanned_document.dart';
 import '../services/audio_storage.dart';
 import '../services/documents_repository.dart';
 import '../services/gemini_transcription_service.dart';
@@ -259,33 +258,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _enterSelectionMode(String id) {
-    setState(() {
-      _selectionMode = true;
-      _selectedIds
-        ..clear()
-        ..add(id);
-    });
-  }
-
-  void _exitSelectionMode() {
-    setState(() {
-      _selectionMode = false;
-      _selectedIds.clear();
-    });
-  }
-
-  void _toggleSelection(String id) {
-    setState(() {
-      if (_selectedIds.contains(id)) {
-        _selectedIds.remove(id);
-      } else {
-        _selectedIds.add(id);
-      }
-    });
-  }
-
   Future<void> _generateReport() async {
+    final controller = widget.selectionController;
     final apiKey = await _settings.getGeminiApiKey();
     if (apiKey == null) {
       if (mounted) {
@@ -300,22 +274,34 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    final selected =
+    final selectedRecordings =
         _recordings
             .where(
               (r) =>
-                  _selectedIds.contains(r.id) &&
+                  controller.selectedRecordingIds.contains(r.id) &&
                   r.transcript != null &&
                   r.transcript!.isNotEmpty,
             )
             .toList()
           ..sort((a, b) => a.recordedAt.compareTo(b.recordedAt));
 
-    if (selected.isEmpty) {
+    final allDocuments = await _documentsRepository.load();
+    final selectedDocuments =
+        allDocuments
+            .where(
+              (d) =>
+                  controller.selectedDocumentIds.contains(d.id) &&
+                  d.extractedText != null &&
+                  d.extractedText!.isNotEmpty,
+            )
+            .toList()
+          ..sort((a, b) => a.scannedAt.compareTo(b.scannedAt));
+
+    if (selectedRecordings.isEmpty && selectedDocuments.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('තෝරාගත් පටිගත කිරීම්වල පිටපත් නොමැත'),
+            content: Text('තෝරාගත් අයිතමවල පෙළ නොමැත'),
           ),
         );
       }
@@ -326,18 +312,20 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final summary = await _reportService.generateSummary(
         apiKey: apiKey,
-        recordings: selected,
+        recordings: selectedRecordings,
+        documents: selectedDocuments,
       );
       final pdfBytes = await _reportService.buildPdf(
         summary: summary,
-        recordings: selected,
+        recordings: selectedRecordings,
+        documents: selectedDocuments,
       );
       await Printing.sharePdf(
         bytes: pdfBytes,
         filename: 'session-report-${DateTime.now().millisecondsSinceEpoch}.pdf',
       );
       if (mounted) {
-        _exitSelectionMode();
+        controller.exitSelectionMode();
       }
     } catch (e) {
       debugPrint('Failed to generate report: $e');
@@ -475,14 +463,24 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: widget.selectionController,
+      builder: (context, _) => _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
+    final controller = widget.selectionController;
     return Scaffold(
-      appBar: _selectionMode
+      appBar: controller.selectionMode
           ? AppBar(
               leading: IconButton(
                 icon: const Icon(Icons.close_rounded),
-                onPressed: _generatingReport ? null : _exitSelectionMode,
+                onPressed: _generatingReport
+                    ? null
+                    : controller.exitSelectionMode,
               ),
-              title: Text('${_selectedIds.length} තෝරා ඇත'),
+              title: Text('${controller.count} තෝරා ඇත'),
               actions: [
                 if (_generatingReport)
                   const Padding(
@@ -502,7 +500,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   IconButton(
                     icon: const Icon(Icons.picture_as_pdf_outlined),
                     tooltip: 'වාර්තාව ලබාගන්න',
-                    onPressed: _selectedIds.isEmpty ? null : _generateReport,
+                    onPressed: controller.count == 0 ? null : _generateReport,
                   ),
               ],
             )
@@ -514,7 +512,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   tooltip: 'වාර්තාවක් සකසන්න',
                   onPressed: _recordings.isEmpty
                       ? null
-                      : () => setState(() => _selectionMode = true),
+                      : controller.enterSelectionMode,
                 ),
                 IconButton(
                   icon: const Icon(Icons.key_outlined),
@@ -613,19 +611,19 @@ class _HomeScreenState extends State<HomeScreen> {
                         itemBuilder: (context, index) {
                           final recording = _recordings[index];
                           final isPlaying = _playingId == recording.id;
-                          final isSelected = _selectedIds.contains(
-                            recording.id,
-                          );
+                          final isSelected = controller
+                              .selectedRecordingIds
+                              .contains(recording.id);
                           return Card(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 ListTile(
-                                  leading: _selectionMode
+                                  leading: controller.selectionMode
                                       ? Checkbox(
                                           value: isSelected,
-                                          onChanged: (_) =>
-                                              _toggleSelection(recording.id),
+                                          onChanged: (_) => controller
+                                              .toggleRecording(recording.id),
                                         )
                                       : Icon(
                                           isPlaying
@@ -643,7 +641,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     '${recording.recordedAt.hour.toString().padLeft(2, '0')}:${recording.recordedAt.minute.toString().padLeft(2, '0')}'
                                     '${recording.title != null ? ' • ${_formatDuration(recording.duration)}' : ''}',
                                   ),
-                                  trailing: _selectionMode
+                                  trailing: controller.selectionMode
                                       ? null
                                       : Row(
                                           mainAxisSize: MainAxisSize.min,
@@ -673,12 +671,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                             ),
                                           ],
                                         ),
-                                  onTap: _selectionMode
-                                      ? () => _toggleSelection(recording.id)
+                                  onTap: controller.selectionMode
+                                      ? () => controller.toggleRecording(
+                                          recording.id,
+                                        )
                                       : () => _playRecording(recording),
-                                  onLongPress: _selectionMode
+                                  onLongPress: controller.selectionMode
                                       ? null
-                                      : () => _enterSelectionMode(
+                                      : () => controller.toggleRecording(
                                           recording.id,
                                         ),
                                 ),

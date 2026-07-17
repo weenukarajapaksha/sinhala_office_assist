@@ -3,15 +3,21 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:image_picker/image_picker.dart';
+import 'package:printing/printing.dart';
 
 import '../models/scanned_document.dart';
 import '../services/documents_repository.dart';
 import '../services/gemini_ocr_service.dart';
+import '../services/recordings_repository.dart';
+import '../services/session_report_service.dart';
+import '../services/session_selection_controller.dart';
 import '../services/settings_repository.dart';
 import '../theme/app_theme.dart';
 
 class DocumentsScreen extends StatefulWidget {
-  const DocumentsScreen({super.key});
+  const DocumentsScreen({required this.selectionController, super.key});
+
+  final SessionSelectionController selectionController;
 
   @override
   State<DocumentsScreen> createState() => _DocumentsScreenState();
@@ -20,12 +26,15 @@ class DocumentsScreen extends StatefulWidget {
 class _DocumentsScreenState extends State<DocumentsScreen> {
   final ImagePicker _picker = ImagePicker();
   final DocumentsRepository _repository = DocumentsRepository();
+  final RecordingsRepository _recordingsRepository = RecordingsRepository();
   final SettingsRepository _settings = SettingsRepository();
   final GeminiOcrService _ocrService = GeminiOcrService();
+  final SessionReportService _reportService = SessionReportService();
   final List<ScannedDocument> _documents = [];
   final Set<String> _extractingIds = {};
 
   bool _isLoading = true;
+  bool _generatingReport = false;
 
   @override
   void initState() {
@@ -207,18 +216,152 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     await _repository.save(_documents);
   }
 
+  Future<void> _generateReport() async {
+    final controller = widget.selectionController;
+    final apiKey = await _settings.getGeminiApiKey();
+    if (apiKey == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'වාර්තාවක් සකසන්න Gemini API key එකක් සකසන්න (සැකසුම්)',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    final selectedDocuments =
+        _documents
+            .where(
+              (d) =>
+                  controller.selectedDocumentIds.contains(d.id) &&
+                  d.extractedText != null &&
+                  d.extractedText!.isNotEmpty,
+            )
+            .toList()
+          ..sort((a, b) => a.scannedAt.compareTo(b.scannedAt));
+
+    final allRecordings = await _recordingsRepository.load();
+    final selectedRecordings =
+        allRecordings
+            .where(
+              (r) =>
+                  controller.selectedRecordingIds.contains(r.id) &&
+                  r.transcript != null &&
+                  r.transcript!.isNotEmpty,
+            )
+            .toList()
+          ..sort((a, b) => a.recordedAt.compareTo(b.recordedAt));
+
+    if (selectedRecordings.isEmpty && selectedDocuments.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('තෝරාගත් අයිතමවල පෙළ නොමැත')),
+        );
+      }
+      return;
+    }
+
+    setState(() => _generatingReport = true);
+    try {
+      final summary = await _reportService.generateSummary(
+        apiKey: apiKey,
+        recordings: selectedRecordings,
+        documents: selectedDocuments,
+      );
+      final pdfBytes = await _reportService.buildPdf(
+        summary: summary,
+        recordings: selectedRecordings,
+        documents: selectedDocuments,
+      );
+      await Printing.sharePdf(
+        bytes: pdfBytes,
+        filename: 'session-report-${DateTime.now().millisecondsSinceEpoch}.pdf',
+      );
+      if (mounted) {
+        controller.exitSelectionMode();
+      }
+    } catch (e) {
+      debugPrint('Failed to generate report: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('වාර්තාව සකසීම අසාර්ථකයි: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _generatingReport = false);
+      }
+    }
+  }
+
   String _formatDateTime(DateTime dt) =>
       '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} '
       '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
 
   @override
   Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: widget.selectionController,
+      builder: (context, _) => _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
+    final controller = widget.selectionController;
     return Scaffold(
-      appBar: AppBar(title: const Text('ලේඛන')),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showSourceSheet,
-        child: const Icon(Icons.document_scanner_outlined),
-      ),
+      appBar: controller.selectionMode
+          ? AppBar(
+              leading: IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: _generatingReport
+                    ? null
+                    : controller.exitSelectionMode,
+              ),
+              title: Text('${controller.count} තෝරා ඇත'),
+              actions: [
+                if (_generatingReport)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  IconButton(
+                    icon: const Icon(Icons.picture_as_pdf_outlined),
+                    tooltip: 'වාර්තාව ලබාගන්න',
+                    onPressed: controller.count == 0 ? null : _generateReport,
+                  ),
+              ],
+            )
+          : AppBar(
+              title: const Text('ලේඛන'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.checklist_rounded),
+                  tooltip: 'වාර්තාවක් සකසන්න',
+                  onPressed: _documents.isEmpty
+                      ? null
+                      : controller.enterSelectionMode,
+                ),
+              ],
+            ),
+      floatingActionButton: controller.selectionMode
+          ? null
+          : FloatingActionButton(
+              onPressed: _showSourceSheet,
+              child: const Icon(Icons.document_scanner_outlined),
+            ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),
@@ -231,48 +374,65 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                   separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final document = _documents[index];
+                    final isSelected = controller.selectedDocumentIds
+                        .contains(document.id);
                     return Card(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           ListTile(
-                            leading: ClipRRect(
-                              borderRadius: BorderRadius.circular(6),
-                              child: Image.memory(
-                                document.imageBytes,
-                                width: 48,
-                                height: 48,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
+                            leading: controller.selectionMode
+                                ? Checkbox(
+                                    value: isSelected,
+                                    onChanged: (_) =>
+                                        controller.toggleDocument(document.id),
+                                  )
+                                : ClipRRect(
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: Image.memory(
+                                      document.imageBytes,
+                                      width: 48,
+                                      height: 48,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
                             title: Text(
                               document.title ??
                                   _formatDateTime(document.scannedAt),
                             ),
                             subtitle: Text(_formatDateTime(document.scannedAt)),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit_outlined),
-                                  color: AppTheme.textSecondary,
-                                  tooltip: 'Rename',
-                                  onPressed: () => _renameDocument(document),
-                                ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.delete_outline_rounded,
+                            trailing: controller.selectionMode
+                                ? null
+                                : Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.edit_outlined),
+                                        color: AppTheme.textSecondary,
+                                        tooltip: 'Rename',
+                                        onPressed: () =>
+                                            _renameDocument(document),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.delete_outline_rounded,
+                                        ),
+                                        color: AppTheme.textSecondary,
+                                        tooltip: 'මකන්න',
+                                        onPressed: () async {
+                                          if (await _confirmDelete()) {
+                                            await _deleteDocument(document);
+                                          }
+                                        },
+                                      ),
+                                    ],
                                   ),
-                                  color: AppTheme.textSecondary,
-                                  tooltip: 'මකන්න',
-                                  onPressed: () async {
-                                    if (await _confirmDelete()) {
-                                      await _deleteDocument(document);
-                                    }
-                                  },
-                                ),
-                              ],
-                            ),
+                            onTap: controller.selectionMode
+                                ? () => controller.toggleDocument(document.id)
+                                : null,
+                            onLongPress: controller.selectionMode
+                                ? null
+                                : () => controller.toggleDocument(document.id),
                           ),
                           if (_extractingIds.contains(document.id))
                             const Padding(
