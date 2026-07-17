@@ -33,18 +33,52 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   final GeminiOcrService _ocrService = GeminiOcrService();
   final GeminiTranslationService _translationService =
       GeminiTranslationService();
+  final GeminiSummaryService _summaryService = GeminiSummaryService();
   final SessionReportService _reportService = SessionReportService();
   final List<ScannedDocument> _documents = [];
   final Set<String> _extractingIds = {};
   final Set<String> _translatingIds = {};
+  final Set<String> _summarizingIds = {};
 
   bool _isLoading = true;
   bool _generatingReport = false;
+  bool _searchMode = false;
+  final TextEditingController _searchController = TextEditingController();
+  String _query = '';
 
   @override
   void initState() {
     super.initState();
     _loadDocuments();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _enterSearchMode() {
+    setState(() => _searchMode = true);
+  }
+
+  void _exitSearchMode() {
+    setState(() {
+      _searchMode = false;
+      _query = '';
+      _searchController.clear();
+    });
+  }
+
+  List<ScannedDocument> get _visibleDocuments {
+    if (_query.isEmpty) return _documents;
+    final query = _query.toLowerCase();
+    return _documents.where((d) {
+      return (d.title?.toLowerCase().contains(query) ?? false) ||
+          (d.extractedText?.toLowerCase().contains(query) ?? false) ||
+          (d.translatedText?.toLowerCase().contains(query) ?? false) ||
+          (d.summaryText?.toLowerCase().contains(query) ?? false);
+    }).toList();
   }
 
   Future<void> _loadDocuments() async {
@@ -189,6 +223,53 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     } finally {
       if (mounted) {
         setState(() => _translatingIds.remove(document.id));
+      }
+    }
+  }
+
+  Future<void> _summarizeDocument(ScannedDocument document) async {
+    final apiKey = await _settings.getGeminiApiKey();
+    if (apiKey == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'සාරාංශ කිරීමට Gemini API key එකක් සකසන්න (රැස්කිරීම් තිරයේ 🔑)',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+    if (document.extractedText == null || document.extractedText!.isEmpty) {
+      return;
+    }
+
+    setState(() => _summarizingIds.add(document.id));
+    try {
+      final summary = await _summaryService.summarize(
+        apiKey: apiKey,
+        text: document.extractedText!,
+      );
+      final index = _documents.indexWhere((d) => d.id == document.id);
+      if (index != -1) {
+        setState(() {
+          _documents[index] = _documents[index].copyWith(
+            summaryText: summary,
+          );
+        });
+        await _repository.save(_documents);
+      }
+    } catch (e) {
+      debugPrint('Failed to summarize document: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('සාරාංශ කිරීම අසාර්ථකයි: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _summarizingIds.remove(document.id));
       }
     }
   }
@@ -397,15 +478,40 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
               ],
             )
           : AppBar(
-              title: const Text('ලේඛන'),
+              title: _searchMode
+                  ? TextField(
+                      controller: _searchController,
+                      autofocus: true,
+                      style: const TextStyle(color: Colors.white),
+                      cursorColor: Colors.white,
+                      decoration: const InputDecoration(
+                        hintText: 'ලේඛන සොයන්න...',
+                        hintStyle: TextStyle(color: Colors.white70),
+                        border: InputBorder.none,
+                      ),
+                      onChanged: (value) => setState(() => _query = value),
+                    )
+                  : const Text('ලේඛන'),
               actions: [
-                IconButton(
-                  icon: const Icon(Icons.checklist_rounded),
-                  tooltip: 'වාර්තාවක් සකසන්න',
-                  onPressed: _documents.isEmpty
-                      ? null
-                      : controller.enterSelectionMode,
-                ),
+                if (_searchMode)
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: _exitSearchMode,
+                  )
+                else ...[
+                  IconButton(
+                    icon: const Icon(Icons.search_rounded),
+                    tooltip: 'සොයන්න',
+                    onPressed: _documents.isEmpty ? null : _enterSearchMode,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.checklist_rounded),
+                    tooltip: 'වාර්තාවක් සකසන්න',
+                    onPressed: _documents.isEmpty
+                        ? null
+                        : controller.enterSelectionMode,
+                  ),
+                ],
               ],
             ),
       floatingActionButton: controller.selectionMode
@@ -417,15 +523,30 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _documents.isEmpty
-              ? const _EmptyDocumentsState()
-              : ListView.separated(
-                  itemCount: _documents.length,
+          child: Builder(
+            builder: (context) {
+              final visibleDocuments = _visibleDocuments;
+              if (_isLoading) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (_documents.isEmpty) {
+                return const _EmptyDocumentsState();
+              }
+              if (visibleDocuments.isEmpty) {
+                return Center(
+                  child: Text(
+                    'ගැලපෙන ලේඛන නොමැත',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                );
+              }
+              return ListView.separated(
+                  itemCount: visibleDocuments.length,
                   separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
-                    final document = _documents[index];
+                    final document = visibleDocuments[index];
                     final isSelected = controller.selectedDocumentIds
                         .contains(document.id);
                     return Card(
@@ -549,6 +670,16 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                                       ),
                                       IconButton(
                                         icon: const Icon(
+                                          Icons.summarize_outlined,
+                                          size: 18,
+                                        ),
+                                        color: AppTheme.textSecondary,
+                                        tooltip: 'සාරාංශ කරන්න',
+                                        onPressed: () =>
+                                            _summarizeDocument(document),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
                                           Icons.copy_outlined,
                                           size: 18,
                                         ),
@@ -617,6 +748,66 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                                         ],
                                       ),
                                     ),
+                                  if (_summarizingIds.contains(document.id))
+                                    const Padding(
+                                      padding: EdgeInsets.only(top: 8),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          SizedBox(
+                                            width: 14,
+                                            height: 14,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          ),
+                                          SizedBox(width: 8),
+                                          Text('සාරාංශ කරමින්...'),
+                                        ],
+                                      ),
+                                    )
+                                  else if (document.summaryText != null)
+                                    Container(
+                                      margin: const EdgeInsets.only(top: 8),
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.accentTeal.withValues(
+                                          alpha: 0.08,
+                                        ),
+                                        borderRadius: BorderRadius.circular(
+                                          AppTheme.borderRadius,
+                                        ),
+                                        border: Border.all(
+                                          color: AppTheme.accentTeal
+                                              .withValues(alpha: 0.3),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              document.summaryText!,
+                                              style: Theme.of(
+                                                context,
+                                              ).textTheme.bodyMedium,
+                                            ),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.copy_outlined,
+                                              size: 16,
+                                            ),
+                                            color: AppTheme.textSecondary,
+                                            tooltip: 'පිටපත් කරන්න',
+                                            onPressed: () => _copyText(
+                                              document.summaryText!,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                 ],
                               ),
                             )
@@ -644,7 +835,9 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                       ),
                     );
                   },
-                ),
+                );
+            },
+          ),
         ),
       ),
     );
