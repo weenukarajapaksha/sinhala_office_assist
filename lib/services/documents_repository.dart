@@ -18,6 +18,8 @@ class DocumentsRepository {
         imageBytes: base64Decode(map['imageBase64'] as String),
         title: map['title'] as String?,
         extractedText: map['extractedText'] as String?,
+        translatedText: map['translatedText'] as String?,
+        summaryText: map['summaryText'] as String?,
       );
     }).toList();
   }
@@ -32,6 +34,8 @@ class DocumentsRepository {
             'imageBase64': base64Encode(d.imageBytes),
             if (d.title != null) 'title': d.title,
             if (d.extractedText != null) 'extractedText': d.extractedText,
+            if (d.translatedText != null) 'translatedText': d.translatedText,
+            if (d.summaryText != null) 'summaryText': d.summaryText,
           }),
         )
         .toList();

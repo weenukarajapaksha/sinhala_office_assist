@@ -7,6 +7,8 @@ class ScannedDocument {
     required this.imageBytes,
     this.title,
     this.extractedText,
+    this.translatedText,
+    this.summaryText,
   });
 
   final String id;
@@ -21,12 +23,24 @@ class ScannedDocument {
   /// Text extracted from the image via Gemini OCR, if generated.
   final String? extractedText;
 
-  ScannedDocument copyWith({String? title, String? extractedText}) =>
-      ScannedDocument(
-        id: id,
-        scannedAt: scannedAt,
-        imageBytes: imageBytes,
-        title: title ?? this.title,
-        extractedText: extractedText ?? this.extractedText,
-      );
+  /// Sinhala<->English translation of [extractedText], if generated.
+  final String? translatedText;
+
+  /// Key-points summary of [extractedText], if generated.
+  final String? summaryText;
+
+  ScannedDocument copyWith({
+    String? title,
+    String? extractedText,
+    String? translatedText,
+    String? summaryText,
+  }) => ScannedDocument(
+    id: id,
+    scannedAt: scannedAt,
+    imageBytes: imageBytes,
+    title: title ?? this.title,
+    extractedText: extractedText ?? this.extractedText,
+    translatedText: translatedText ?? this.translatedText,
+    summaryText: summaryText ?? this.summaryText,
+  );
 }

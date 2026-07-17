@@ -8,6 +8,8 @@ import 'package:printing/printing.dart';
 import '../models/scanned_document.dart';
 import '../services/documents_repository.dart';
 import '../services/gemini_ocr_service.dart';
+import '../services/gemini_summary_service.dart';
+import '../services/gemini_translation_service.dart';
 import '../services/recordings_repository.dart';
 import '../services/session_report_service.dart';
 import '../services/session_selection_controller.dart';
@@ -29,9 +31,12 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   final RecordingsRepository _recordingsRepository = RecordingsRepository();
   final SettingsRepository _settings = SettingsRepository();
   final GeminiOcrService _ocrService = GeminiOcrService();
+  final GeminiTranslationService _translationService =
+      GeminiTranslationService();
   final SessionReportService _reportService = SessionReportService();
   final List<ScannedDocument> _documents = [];
   final Set<String> _extractingIds = {};
+  final Set<String> _translatingIds = {};
 
   bool _isLoading = true;
   bool _generatingReport = false;
@@ -137,6 +142,53 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     } finally {
       if (mounted) {
         setState(() => _extractingIds.remove(document.id));
+      }
+    }
+  }
+
+  Future<void> _translateDocument(ScannedDocument document) async {
+    final apiKey = await _settings.getGeminiApiKey();
+    if (apiKey == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'පරිවර්තනය කිරීමට Gemini API key එකක් සකසන්න (රැස්කිරීම් තිරයේ 🔑)',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+    if (document.extractedText == null || document.extractedText!.isEmpty) {
+      return;
+    }
+
+    setState(() => _translatingIds.add(document.id));
+    try {
+      final translated = await _translationService.translate(
+        apiKey: apiKey,
+        text: document.extractedText!,
+      );
+      final index = _documents.indexWhere((d) => d.id == document.id);
+      if (index != -1) {
+        setState(() {
+          _documents[index] = _documents[index].copyWith(
+            translatedText: translated,
+          );
+        });
+        await _repository.save(_documents);
+      }
+    } catch (e) {
+      debugPrint('Failed to translate document: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('පරිවර්තනය අසාර්ථකයි: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _translatingIds.remove(document.id));
       }
     }
   }
@@ -460,36 +512,111 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                                 16,
                                 16,
                               ),
-                              child: Row(
+                              child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Expanded(
-                                    child: Text(
-                                      document.extractedText!,
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.bodyMedium,
-                                    ),
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          document.extractedText!,
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.bodyMedium,
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.refresh_rounded,
+                                          size: 18,
+                                        ),
+                                        color: AppTheme.textSecondary,
+                                        tooltip: 'නැවත උපුටා ගන්න',
+                                        onPressed: () =>
+                                            _extractText(document),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.translate_rounded,
+                                          size: 18,
+                                        ),
+                                        color: AppTheme.textSecondary,
+                                        tooltip: 'පරිවර්තනය කරන්න',
+                                        onPressed: () =>
+                                            _translateDocument(document),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.copy_outlined,
+                                          size: 18,
+                                        ),
+                                        color: AppTheme.textSecondary,
+                                        tooltip: 'පිටපත් කරන්න',
+                                        onPressed: () => _copyText(
+                                          document.extractedText!,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.refresh_rounded,
-                                      size: 18,
+                                  if (_translatingIds.contains(document.id))
+                                    const Padding(
+                                      padding: EdgeInsets.only(top: 8),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          SizedBox(
+                                            width: 14,
+                                            height: 14,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          ),
+                                          SizedBox(width: 8),
+                                          Text('පරිවර්තනය කරමින්...'),
+                                        ],
+                                      ),
+                                    )
+                                  else if (document.translatedText != null)
+                                    Container(
+                                      margin: const EdgeInsets.only(top: 8),
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.backgroundLight,
+                                        borderRadius: BorderRadius.circular(
+                                          AppTheme.borderRadius,
+                                        ),
+                                        border: Border.all(
+                                          color: AppTheme.divider,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              document.translatedText!,
+                                              style: Theme.of(
+                                                context,
+                                              ).textTheme.bodyMedium,
+                                            ),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.copy_outlined,
+                                              size: 16,
+                                            ),
+                                            color: AppTheme.textSecondary,
+                                            tooltip: 'පිටපත් කරන්න',
+                                            onPressed: () => _copyText(
+                                              document.translatedText!,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                    color: AppTheme.textSecondary,
-                                    tooltip: 'නැවත උපුටා ගන්න',
-                                    onPressed: () => _extractText(document),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.copy_outlined,
-                                      size: 18,
-                                    ),
-                                    color: AppTheme.textSecondary,
-                                    tooltip: 'පිටපත් කරන්න',
-                                    onPressed: () =>
-                                        _copyText(document.extractedText!),
-                                  ),
                                 ],
                               ),
                             )
