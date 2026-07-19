@@ -283,6 +283,24 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     }
   }
 
+  Future<void> _exportDocument(ScannedDocument document) async {
+    try {
+      final bytes = await _reportService.buildSingleDocumentPdf(document);
+      await Printing.sharePdf(
+        bytes: bytes,
+        filename:
+            '${document.title ?? document.id}-${DateTime.now().millisecondsSinceEpoch}.pdf',
+      );
+    } catch (e) {
+      debugPrint('Failed to export document: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('PDF එක සකසීම අසාර්ථකයි: $e')),
+        );
+      }
+    }
+  }
+
   Future<bool> _confirmDelete() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -688,6 +706,16 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                                         onPressed: () => _copyText(
                                           document.extractedText!,
                                         ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.picture_as_pdf_outlined,
+                                          size: 18,
+                                        ),
+                                        color: AppTheme.textSecondary,
+                                        tooltip: 'PDF ලෙස බාගන්න',
+                                        onPressed: () =>
+                                            _exportDocument(document),
                                       ),
                                     ],
                                   ),

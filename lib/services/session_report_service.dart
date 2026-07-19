@@ -89,16 +89,12 @@ class SessionReportService {
         .trim();
   }
 
-  Future<Uint8List> buildPdf({
-    required String summary,
-    List<Recording> recordings = const [],
-    List<ScannedDocument> documents = const [],
-  }) async {
+  Future<pw.Document> _newSinhalaDocument() async {
     final fontData = await rootBundle.load(
       'assets/fonts/NotoSansSinhala-VariableFont.ttf',
     );
     final sinhalaFont = pw.Font.ttf(fontData);
-    final doc = pw.Document(
+    return pw.Document(
       theme: pw.ThemeData.withFont(
         base: sinhalaFont,
         bold: sinhalaFont,
@@ -106,6 +102,14 @@ class SessionReportService {
         boldItalic: sinhalaFont,
       ),
     );
+  }
+
+  Future<Uint8List> buildPdf({
+    required String summary,
+    List<Recording> recordings = const [],
+    List<ScannedDocument> documents = const [],
+  }) async {
+    final doc = await _newSinhalaDocument();
 
     doc.addPage(
       pw.MultiPage(
@@ -184,6 +188,55 @@ class SessionReportService {
                 ),
                 pw.SizedBox(height: 14),
               ],
+            ),
+          ],
+        ],
+      ),
+    );
+
+    return doc.save();
+  }
+
+  /// Renders a single scanned document's extracted text (plus translation
+  /// and summary, if generated) as a standalone PDF for direct download.
+  Future<Uint8List> buildSingleDocumentPdf(ScannedDocument document) async {
+    final doc = await _newSinhalaDocument();
+
+    doc.addPage(
+      pw.MultiPage(
+        build: (context) => [
+          pw.Text(
+            document.title ?? document.id,
+            style: const pw.TextStyle(fontSize: 22),
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            'ලේඛනගත කළේ: ${_formatDateTime(document.scannedAt)}',
+            style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+          ),
+          pw.SizedBox(height: 16),
+          pw.Text('උපුටාගත් පෙළ', style: const pw.TextStyle(fontSize: 14)),
+          pw.SizedBox(height: 6),
+          pw.Text(
+            document.extractedText ?? '',
+            style: const pw.TextStyle(fontSize: 11),
+          ),
+          if (document.translatedText != null) ...[
+            pw.SizedBox(height: 16),
+            pw.Text('පරිවර්තනය', style: const pw.TextStyle(fontSize: 14)),
+            pw.SizedBox(height: 6),
+            pw.Text(
+              document.translatedText!,
+              style: const pw.TextStyle(fontSize: 11),
+            ),
+          ],
+          if (document.summaryText != null) ...[
+            pw.SizedBox(height: 16),
+            pw.Text('සාරාංශය', style: const pw.TextStyle(fontSize: 14)),
+            pw.SizedBox(height: 6),
+            pw.Text(
+              document.summaryText!,
+              style: const pw.TextStyle(fontSize: 11),
             ),
           ],
         ],
