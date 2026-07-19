@@ -495,7 +495,7 @@ class _HomeScreenState extends State<HomeScreen>
         parent: animation,
         curve: AppTheme.motionCurve,
       ),
-      axisAlignment: -1.0,
+      alignment: const Alignment(-1.0, -1.0),
       child: FadeTransition(
         opacity: animation,
         child: Padding(padding: const EdgeInsets.only(bottom: 8), child: child),
