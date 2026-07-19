@@ -452,6 +452,339 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} '
       '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
 
+  Widget _buildDocumentCard(BuildContext context, ScannedDocument document) {
+    final controller = widget.selectionController;
+    final isSelected = controller.selectedDocumentIds.contains(document.id);
+    final card = Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ListTile(
+            leading: AnimatedSwitcher(
+              duration: AppTheme.motionDuration,
+              transitionBuilder: (child, animation) =>
+                  ScaleTransition(scale: animation, child: child),
+              child: controller.selectionMode
+                  ? Checkbox(
+                      key: const ValueKey('checkbox'),
+                      value: isSelected,
+                      onChanged: (_) => controller.toggleDocument(document.id),
+                    )
+                  : ClipRRect(
+                      key: const ValueKey('thumb'),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Image.memory(
+                        document.imageBytes,
+                        width: 48,
+                        height: 48,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+            ),
+            title: Text(
+              document.title ?? _formatDateTime(document.scannedAt),
+            ),
+            subtitle: Text(_formatDateTime(document.scannedAt)),
+            trailing: controller.selectionMode
+                ? null
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined),
+                        color: AppTheme.textSecondary,
+                        tooltip: 'Rename',
+                        onPressed: () => _renameDocument(document),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline_rounded),
+                        color: AppTheme.textSecondary,
+                        tooltip: 'මකන්න',
+                        onPressed: () async {
+                          if (await _confirmDelete()) {
+                            await _deleteDocument(document);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+            onTap: controller.selectionMode
+                ? () => controller.toggleDocument(document.id)
+                : null,
+            onLongPress: controller.selectionMode
+                ? null
+                : () => controller.toggleDocument(document.id),
+          ),
+          AnimatedSize(
+            duration: AppTheme.motionDuration,
+            curve: AppTheme.motionCurve,
+            alignment: Alignment.topCenter,
+            child: _extractingIds.contains(document.id)
+                ? const Padding(
+                    key: ValueKey('extracting'),
+                    padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        SizedBox(width: 8),
+                        Text('පෙළ උපුටා ගනිමින්...'),
+                      ],
+                    ),
+                  )
+                : document.extractedText != null
+                ? Padding(
+                    key: const ValueKey('extracted'),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                document.extractedText!,
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.refresh_rounded,
+                                size: 18,
+                              ),
+                              color: AppTheme.textSecondary,
+                              tooltip: 'නැවත උපුටා ගන්න',
+                              onPressed: () => _extractText(document),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.translate_rounded,
+                                size: 18,
+                              ),
+                              color: AppTheme.textSecondary,
+                              tooltip: 'පරිවර්තනය කරන්න',
+                              onPressed: () => _translateDocument(document),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.summarize_outlined,
+                                size: 18,
+                              ),
+                              color: AppTheme.textSecondary,
+                              tooltip: 'සාරාංශ කරන්න',
+                              onPressed: () => _summarizeDocument(document),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.copy_outlined, size: 18),
+                              color: AppTheme.textSecondary,
+                              tooltip: 'පිටපත් කරන්න',
+                              onPressed: () =>
+                                  _copyText(document.extractedText!),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.picture_as_pdf_outlined,
+                                size: 18,
+                              ),
+                              color: AppTheme.textSecondary,
+                              tooltip: 'PDF ලෙස බාගන්න',
+                              onPressed: () => _exportDocument(document),
+                            ),
+                          ],
+                        ),
+                        AnimatedSize(
+                          duration: AppTheme.motionDuration,
+                          curve: AppTheme.motionCurve,
+                          alignment: Alignment.topCenter,
+                          child: _translatingIds.contains(document.id)
+                              ? const Padding(
+                                  key: ValueKey('translating'),
+                                  padding: EdgeInsets.only(top: 8),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text('පරිවර්තනය කරමින්...'),
+                                    ],
+                                  ),
+                                )
+                              : document.translatedText != null
+                              ? Container(
+                                  key: const ValueKey('translated'),
+                                  margin: const EdgeInsets.only(top: 8),
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.backgroundLight,
+                                    borderRadius: BorderRadius.circular(
+                                      AppTheme.borderRadius,
+                                    ),
+                                    border: Border.all(color: AppTheme.divider),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          document.translatedText!,
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.bodyMedium,
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.copy_outlined,
+                                          size: 16,
+                                        ),
+                                        color: AppTheme.textSecondary,
+                                        tooltip: 'පිටපත් කරන්න',
+                                        onPressed: () => _copyText(
+                                          document.translatedText!,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : const SizedBox.shrink(
+                                  key: ValueKey('noTranslation'),
+                                ),
+                        ),
+                        AnimatedSize(
+                          duration: AppTheme.motionDuration,
+                          curve: AppTheme.motionCurve,
+                          alignment: Alignment.topCenter,
+                          child: _summarizingIds.contains(document.id)
+                              ? const Padding(
+                                  key: ValueKey('summarizing'),
+                                  padding: EdgeInsets.only(top: 8),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text('සාරාංශ කරමින්...'),
+                                    ],
+                                  ),
+                                )
+                              : document.summaryText != null
+                              ? Container(
+                                  key: const ValueKey('summarized'),
+                                  margin: const EdgeInsets.only(top: 8),
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.accentTeal.withValues(
+                                      alpha: 0.08,
+                                    ),
+                                    borderRadius: BorderRadius.circular(
+                                      AppTheme.borderRadius,
+                                    ),
+                                    border: Border.all(
+                                      color: AppTheme.accentTeal.withValues(
+                                        alpha: 0.3,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          document.summaryText!,
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.bodyMedium,
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.copy_outlined,
+                                          size: 16,
+                                        ),
+                                        color: AppTheme.textSecondary,
+                                        tooltip: 'පිටපත් කරන්න',
+                                        onPressed: () =>
+                                            _copyText(document.summaryText!),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : const SizedBox.shrink(
+                                  key: ValueKey('noSummary'),
+                                ),
+                        ),
+                      ],
+                    ),
+                  )
+                : Padding(
+                    key: const ValueKey('unextracted'),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () => _extractText(document),
+                        icon: const Icon(Icons.refresh_rounded, size: 18),
+                        label: const Text('පෙළ උපුටා ගන්න'),
+                      ),
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+
+    return Dismissible(
+      key: ValueKey(document.id),
+      direction: controller.selectionMode
+          ? DismissDirection.none
+          : DismissDirection.endToStart,
+      confirmDismiss: (_) => _confirmDelete(),
+      onDismissed: (_) => _deleteDocument(document),
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.error,
+          borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+        ),
+        child: const Icon(Icons.delete_outline_rounded, color: Colors.white),
+      ),
+      child: TweenAnimationBuilder<double>(
+        key: ValueKey('anim-${document.id}'),
+        tween: Tween(begin: 0, end: 1),
+        duration: AppTheme.motionDuration,
+        curve: AppTheme.motionCurve,
+        builder: (context, value, child) => Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, (1 - value) * 12),
+            child: child,
+          ),
+        ),
+        child: card,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -463,75 +796,104 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   Widget _buildScaffold(BuildContext context) {
     final controller = widget.selectionController;
     return Scaffold(
-      appBar: controller.selectionMode
-          ? AppBar(
-              leading: IconButton(
+      appBar: AppBar(
+        leading: controller.selectionMode
+            ? IconButton(
                 icon: const Icon(Icons.close_rounded),
                 onPressed: _generatingReport
                     ? null
                     : controller.exitSelectionMode,
-              ),
-              title: Text('${controller.count} තෝරා ඇත'),
-              actions: [
-                if (_generatingReport)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: Center(
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
+              )
+            : null,
+        title: AnimatedSwitcher(
+          duration: AppTheme.motionDuration,
+          child: controller.selectionMode
+              ? Text(
+                  '${controller.count} තෝරා ඇත',
+                  key: const ValueKey('selTitle'),
+                )
+              : _searchMode
+              ? TextField(
+                  key: const ValueKey('searchField'),
+                  controller: _searchController,
+                  autofocus: true,
+                  style: const TextStyle(color: Colors.white),
+                  cursorColor: Colors.white,
+                  decoration: const InputDecoration(
+                    hintText: 'ලේඛන සොයන්න...',
+                    hintStyle: TextStyle(color: Colors.white70),
+                    border: InputBorder.none,
+                  ),
+                  onChanged: (value) => setState(() => _query = value),
+                )
+              : const Text('ලේඛන', key: ValueKey('normalTitle')),
+        ),
+        actions: [
+          AnimatedSwitcher(
+            duration: AppTheme.motionDuration,
+            child: controller.selectionMode
+                ? Row(
+                    key: const ValueKey('selActions'),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_generatingReport)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          child: Center(
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        )
+                      else
+                        IconButton(
+                          icon: const Icon(Icons.picture_as_pdf_outlined),
+                          tooltip: 'වාර්තාව ලබාගන්න',
+                          onPressed: controller.count == 0
+                              ? null
+                              : _generateReport,
                         ),
-                      ),
-                    ),
+                    ],
                   )
-                else
-                  IconButton(
-                    icon: const Icon(Icons.picture_as_pdf_outlined),
-                    tooltip: 'වාර්තාව ලබාගන්න',
-                    onPressed: controller.count == 0 ? null : _generateReport,
-                  ),
-              ],
-            )
-          : AppBar(
-              title: _searchMode
-                  ? TextField(
-                      controller: _searchController,
-                      autofocus: true,
-                      style: const TextStyle(color: Colors.white),
-                      cursorColor: Colors.white,
-                      decoration: const InputDecoration(
-                        hintText: 'ලේඛන සොයන්න...',
-                        hintStyle: TextStyle(color: Colors.white70),
-                        border: InputBorder.none,
+                : _searchMode
+                ? Row(
+                    key: const ValueKey('searchActions'),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: _exitSearchMode,
                       ),
-                      onChanged: (value) => setState(() => _query = value),
-                    )
-                  : const Text('ලේඛන'),
-              actions: [
-                if (_searchMode)
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded),
-                    onPressed: _exitSearchMode,
+                    ],
                   )
-                else ...[
-                  IconButton(
-                    icon: const Icon(Icons.search_rounded),
-                    tooltip: 'සොයන්න',
-                    onPressed: _documents.isEmpty ? null : _enterSearchMode,
+                : Row(
+                    key: const ValueKey('normalActions'),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.search_rounded),
+                        tooltip: 'සොයන්න',
+                        onPressed: _documents.isEmpty
+                            ? null
+                            : _enterSearchMode,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.checklist_rounded),
+                        tooltip: 'වාර්තාවක් සකසන්න',
+                        onPressed: _documents.isEmpty
+                            ? null
+                            : controller.enterSelectionMode,
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.checklist_rounded),
-                    tooltip: 'වාර්තාවක් සකසන්න',
-                    onPressed: _documents.isEmpty
-                        ? null
-                        : controller.enterSelectionMode,
-                  ),
-                ],
-              ],
-            ),
+          ),
+        ],
+      ),
       floatingActionButton: controller.selectionMode
           ? null
           : FloatingActionButton(
@@ -561,309 +923,11 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                 );
               }
               return ListView.separated(
-                  itemCount: visibleDocuments.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final document = visibleDocuments[index];
-                    final isSelected = controller.selectedDocumentIds
-                        .contains(document.id);
-                    return Card(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          ListTile(
-                            leading: controller.selectionMode
-                                ? Checkbox(
-                                    value: isSelected,
-                                    onChanged: (_) =>
-                                        controller.toggleDocument(document.id),
-                                  )
-                                : ClipRRect(
-                                    borderRadius: BorderRadius.circular(6),
-                                    child: Image.memory(
-                                      document.imageBytes,
-                                      width: 48,
-                                      height: 48,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                            title: Text(
-                              document.title ??
-                                  _formatDateTime(document.scannedAt),
-                            ),
-                            subtitle: Text(_formatDateTime(document.scannedAt)),
-                            trailing: controller.selectionMode
-                                ? null
-                                : Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.edit_outlined),
-                                        color: AppTheme.textSecondary,
-                                        tooltip: 'Rename',
-                                        onPressed: () =>
-                                            _renameDocument(document),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.delete_outline_rounded,
-                                        ),
-                                        color: AppTheme.textSecondary,
-                                        tooltip: 'මකන්න',
-                                        onPressed: () async {
-                                          if (await _confirmDelete()) {
-                                            await _deleteDocument(document);
-                                          }
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                            onTap: controller.selectionMode
-                                ? () => controller.toggleDocument(document.id)
-                                : null,
-                            onLongPress: controller.selectionMode
-                                ? null
-                                : () => controller.toggleDocument(document.id),
-                          ),
-                          if (_extractingIds.contains(document.id))
-                            const Padding(
-                              padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SizedBox(
-                                    width: 14,
-                                    height: 14,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text('පෙළ උපුටා ගනිමින්...'),
-                                ],
-                              ),
-                            )
-                          else if (document.extractedText != null)
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(
-                                16,
-                                0,
-                                16,
-                                16,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          document.extractedText!,
-                                          style: Theme.of(
-                                            context,
-                                          ).textTheme.bodyMedium,
-                                        ),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.refresh_rounded,
-                                          size: 18,
-                                        ),
-                                        color: AppTheme.textSecondary,
-                                        tooltip: 'නැවත උපුටා ගන්න',
-                                        onPressed: () =>
-                                            _extractText(document),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.translate_rounded,
-                                          size: 18,
-                                        ),
-                                        color: AppTheme.textSecondary,
-                                        tooltip: 'පරිවර්තනය කරන්න',
-                                        onPressed: () =>
-                                            _translateDocument(document),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.summarize_outlined,
-                                          size: 18,
-                                        ),
-                                        color: AppTheme.textSecondary,
-                                        tooltip: 'සාරාංශ කරන්න',
-                                        onPressed: () =>
-                                            _summarizeDocument(document),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.copy_outlined,
-                                          size: 18,
-                                        ),
-                                        color: AppTheme.textSecondary,
-                                        tooltip: 'පිටපත් කරන්න',
-                                        onPressed: () => _copyText(
-                                          document.extractedText!,
-                                        ),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.picture_as_pdf_outlined,
-                                          size: 18,
-                                        ),
-                                        color: AppTheme.textSecondary,
-                                        tooltip: 'PDF ලෙස බාගන්න',
-                                        onPressed: () =>
-                                            _exportDocument(document),
-                                      ),
-                                    ],
-                                  ),
-                                  if (_translatingIds.contains(document.id))
-                                    const Padding(
-                                      padding: EdgeInsets.only(top: 8),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          SizedBox(
-                                            width: 14,
-                                            height: 14,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                            ),
-                                          ),
-                                          SizedBox(width: 8),
-                                          Text('පරිවර්තනය කරමින්...'),
-                                        ],
-                                      ),
-                                    )
-                                  else if (document.translatedText != null)
-                                    Container(
-                                      margin: const EdgeInsets.only(top: 8),
-                                      padding: const EdgeInsets.all(10),
-                                      decoration: BoxDecoration(
-                                        color: AppTheme.backgroundLight,
-                                        borderRadius: BorderRadius.circular(
-                                          AppTheme.borderRadius,
-                                        ),
-                                        border: Border.all(
-                                          color: AppTheme.divider,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              document.translatedText!,
-                                              style: Theme.of(
-                                                context,
-                                              ).textTheme.bodyMedium,
-                                            ),
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(
-                                              Icons.copy_outlined,
-                                              size: 16,
-                                            ),
-                                            color: AppTheme.textSecondary,
-                                            tooltip: 'පිටපත් කරන්න',
-                                            onPressed: () => _copyText(
-                                              document.translatedText!,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  if (_summarizingIds.contains(document.id))
-                                    const Padding(
-                                      padding: EdgeInsets.only(top: 8),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          SizedBox(
-                                            width: 14,
-                                            height: 14,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                            ),
-                                          ),
-                                          SizedBox(width: 8),
-                                          Text('සාරාංශ කරමින්...'),
-                                        ],
-                                      ),
-                                    )
-                                  else if (document.summaryText != null)
-                                    Container(
-                                      margin: const EdgeInsets.only(top: 8),
-                                      padding: const EdgeInsets.all(10),
-                                      decoration: BoxDecoration(
-                                        color: AppTheme.accentTeal.withValues(
-                                          alpha: 0.08,
-                                        ),
-                                        borderRadius: BorderRadius.circular(
-                                          AppTheme.borderRadius,
-                                        ),
-                                        border: Border.all(
-                                          color: AppTheme.accentTeal
-                                              .withValues(alpha: 0.3),
-                                        ),
-                                      ),
-                                      child: Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              document.summaryText!,
-                                              style: Theme.of(
-                                                context,
-                                              ).textTheme.bodyMedium,
-                                            ),
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(
-                                              Icons.copy_outlined,
-                                              size: 16,
-                                            ),
-                                            color: AppTheme.textSecondary,
-                                            tooltip: 'පිටපත් කරන්න',
-                                            onPressed: () => _copyText(
-                                              document.summaryText!,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            )
-                          else
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(
-                                16,
-                                0,
-                                16,
-                                16,
-                              ),
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: TextButton.icon(
-                                  onPressed: () => _extractText(document),
-                                  icon: const Icon(
-                                    Icons.refresh_rounded,
-                                    size: 18,
-                                  ),
-                                  label: const Text('පෙළ උපුටා ගන්න'),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    );
-                  },
-                );
+                itemCount: visibleDocuments.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 8),
+                itemBuilder: (context, index) =>
+                    _buildDocumentCard(context, visibleDocuments[index]),
+              );
             },
           ),
         ),
@@ -879,21 +943,29 @@ class _EmptyDocumentsState extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.document_scanner_outlined,
-            size: 48,
-            color: AppTheme.textSecondary.withValues(alpha: 0.5),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'ලේඛන නොමැත',
-            style: textTheme.bodyLarge?.copyWith(color: AppTheme.textSecondary),
-            textAlign: TextAlign.center,
-          ),
-        ],
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: AppTheme.motionDuration,
+        builder: (context, value, child) =>
+            Opacity(opacity: value, child: child),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.document_scanner_outlined,
+              size: 48,
+              color: AppTheme.textSecondary.withValues(alpha: 0.5),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'ලේඛන නොමැත',
+              style: textTheme.bodyLarge?.copyWith(
+                color: AppTheme.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }
