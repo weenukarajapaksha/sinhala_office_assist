@@ -18,8 +18,13 @@ class AppTheme {
   static const Color textSecondary = Color(0xFF5B6470);
   static const Color divider = Color(0xFFE1E4E8);
 
-  static const double borderRadius = 8.0;
+  static const double borderRadius = 12.0;
   static const double sinhalaLineHeight = 1.5;
+
+  /// Standard duration/curve for the app's subtle, professional motion —
+  /// list entrances, AppBar crossfades, and expand/collapse transitions.
+  static const Duration motionDuration = Duration(milliseconds: 220);
+  static const Curve motionCurve = Curves.easeOutCubic;
 
   static ThemeData get lightTheme {
     final baseTextTheme = GoogleFonts.notoSansSinhalaTextTheme();
@@ -83,20 +88,32 @@ class AppTheme {
         onSurface: textPrimary,
       ),
       textTheme: textTheme,
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
+          TargetPlatform.iOS: FadeForwardsPageTransitionsBuilder(),
+          TargetPlatform.macOS: FadeForwardsPageTransitionsBuilder(),
+          TargetPlatform.windows: FadeForwardsPageTransitionsBuilder(),
+          TargetPlatform.linux: FadeForwardsPageTransitionsBuilder(),
+        },
+      ),
       appBarTheme: AppBarTheme(
         backgroundColor: primaryBlue,
         foregroundColor: surfaceWhite,
         elevation: 0,
+        scrolledUnderElevation: 2,
         centerTitle: false,
         titleTextStyle: textTheme.titleLarge?.copyWith(
           color: surfaceWhite,
           fontWeight: FontWeight.w600,
         ),
+        toolbarTextStyle: textTheme.bodyMedium,
       ),
       cardTheme: CardThemeData(
         color: surfaceWhite,
-        elevation: 1,
-        shadowColor: Colors.black.withValues(alpha: 0.08),
+        elevation: 2,
+        shadowColor: Colors.black.withValues(alpha: 0.10),
+        clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(borderRadius),
         ),
@@ -113,6 +130,7 @@ class AppTheme {
             borderRadius: BorderRadius.circular(borderRadius),
           ),
           textStyle: textTheme.labelLarge,
+          animationDuration: motionDuration,
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -124,7 +142,66 @@ class AppTheme {
             borderRadius: BorderRadius.circular(borderRadius),
           ),
           textStyle: textTheme.labelLarge?.copyWith(color: primaryBlue),
+          animationDuration: motionDuration,
         ),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          highlightColor: accentTeal.withValues(alpha: 0.12),
+          hoverColor: accentTeal.withValues(alpha: 0.08),
+        ),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: accentTeal,
+        foregroundColor: surfaceWhite,
+        elevation: 2,
+        highlightElevation: 4,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(borderRadius + 4),
+        ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: surfaceWhite,
+        indicatorColor: accentTeal.withValues(alpha: 0.16),
+        surfaceTintColor: Colors.transparent,
+        elevation: 3,
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return textTheme.bodyMedium?.copyWith(
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+            color: selected ? primaryBlue : textSecondary,
+          );
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return IconThemeData(
+            color: selected ? primaryBlue : textSecondary,
+          );
+        }),
+      ),
+      checkboxTheme: CheckboxThemeData(
+        fillColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return accentTeal;
+          return null;
+        }),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(4),
+        ),
+      ),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(
+        color: accentTeal,
+        linearTrackColor: divider,
+        circularTrackColor: divider,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: primaryBlue,
+        contentTextStyle: textTheme.bodyMedium?.copyWith(color: surfaceWhite),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(borderRadius),
+        ),
+        actionTextColor: accentTeal,
       ),
       dividerTheme: const DividerThemeData(
         color: divider,
@@ -132,8 +209,8 @@ class AppTheme {
         space: 1,
       ),
       iconTheme: const IconThemeData(color: primaryBlue),
-      splashFactory: NoSplash.splashFactory,
-      highlightColor: Colors.transparent,
+      splashColor: accentTeal.withValues(alpha: 0.10),
+      highlightColor: accentTeal.withValues(alpha: 0.06),
     );
   }
 }
