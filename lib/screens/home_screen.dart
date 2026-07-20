@@ -8,6 +8,7 @@ import 'package:record/record.dart';
 
 import '../models/recording.dart';
 import '../services/audio_storage.dart';
+import '../services/background_recording_service.dart';
 import '../services/documents_repository.dart';
 import '../services/gemini_transcription_service.dart';
 import '../services/recordings_repository.dart';
@@ -84,6 +85,9 @@ class _HomeScreenState extends State<HomeScreen>
     _ticker?.cancel();
     _amplitudeSub?.cancel();
     _pulseController.dispose();
+    if (_isRecording) {
+      unawaited(BackgroundRecordingService.stop());
+    }
     _recorder.dispose();
     _player.dispose();
     super.dispose();
@@ -120,6 +124,7 @@ class _HomeScreenState extends State<HomeScreen>
         const RecordConfig(encoder: AudioEncoder.opus),
         path: path,
       );
+      unawaited(BackgroundRecordingService.start());
 
       setState(() {
         _isRecording = true;
@@ -153,6 +158,7 @@ class _HomeScreenState extends State<HomeScreen>
     _ticker?.cancel();
     await _amplitudeSub?.cancel();
     _amplitudeSub = null;
+    unawaited(BackgroundRecordingService.stop());
     try {
       final recordedPath = await _recorder.stop();
 
