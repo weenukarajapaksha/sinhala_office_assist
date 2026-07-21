@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 /// Central design system for Sinhala Office Assist.
 ///
 /// Clean, professional, office/government feel: deep trustworthy blue as
 /// primary, muted teal as accent, white/light-gray backgrounds, and
 /// Noto Sans Sinhala throughout with extra line-height for legibility.
+///
+/// The font is bundled locally (assets/fonts) rather than fetched at
+/// runtime via google_fonts, so text renders correctly offline.
 class AppTheme {
   AppTheme._();
+
+  static const String fontFamily = 'NotoSansSinhala';
 
   static const Color primaryBlue = Color(0xFF1B3A5C);
   static const Color primaryBlueLight = Color(0xFF2C5079);
@@ -27,7 +31,7 @@ class AppTheme {
   static const Curve motionCurve = Curves.easeOutCubic;
 
   static ThemeData get lightTheme {
-    final baseTextTheme = GoogleFonts.notoSansSinhalaTextTheme();
+    final baseTextTheme = ThemeData.light().textTheme;
 
     final textTheme = baseTextTheme.copyWith(
       headlineLarge: baseTextTheme.headlineLarge?.copyWith(
@@ -77,6 +81,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
+      fontFamily: fontFamily,
       scaffoldBackgroundColor: backgroundLight,
       colorScheme: const ColorScheme.light(
         primary: primaryBlue,
