@@ -904,32 +904,64 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),
-          child: Builder(
-            builder: (context) {
-              final visibleDocuments = _visibleDocuments;
-              if (_isLoading) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (_documents.isEmpty) {
-                return const _EmptyDocumentsState();
-              }
-              if (visibleDocuments.isEmpty) {
-                return Center(
-                  child: Text(
-                    'ගැලපෙන ලේඛන නොමැත',
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: AppTheme.textSecondary,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: StatTile(
+                      icon: Icons.document_scanner_outlined,
+                      value: '${_documents.length}',
+                      label: 'ලේඛන',
+                      color: AppTheme.primaryBlue,
                     ),
                   ),
-                );
-              }
-              return ListView.separated(
-                itemCount: visibleDocuments.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 8),
-                itemBuilder: (context, index) =>
-                    _buildDocumentCard(context, visibleDocuments[index]),
-              );
-            },
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: StatTile(
+                      icon: Icons.text_snippet_outlined,
+                      value:
+                          '${_documents.where((d) => d.extractedText != null && d.extractedText!.isNotEmpty).length}',
+                      label: 'පෙළ සකසා ඇත',
+                      color: AppTheme.accentTeal,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Expanded(
+                child: Builder(
+                  builder: (context) {
+                    final visibleDocuments = _visibleDocuments;
+                    if (_isLoading) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (_documents.isEmpty) {
+                      return const _EmptyDocumentsState();
+                    }
+                    if (visibleDocuments.isEmpty) {
+                      return Center(
+                        child: Text(
+                          'ගැලපෙන ලේඛන නොමැත',
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodyLarge?.copyWith(
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      );
+                    }
+                    return ListView.separated(
+                      itemCount: visibleDocuments.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) =>
+                          _buildDocumentCard(context, visibleDocuments[index]),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         ),
       ),
