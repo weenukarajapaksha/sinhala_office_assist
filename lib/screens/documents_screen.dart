@@ -15,6 +15,7 @@ import '../services/session_report_service.dart';
 import '../services/session_selection_controller.dart';
 import '../services/settings_repository.dart';
 import '../theme/app_theme.dart';
+import '../widgets/stat_tile.dart';
 
 class DocumentsScreen extends StatefulWidget {
   const DocumentsScreen({required this.selectionController, super.key});
