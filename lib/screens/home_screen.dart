@@ -738,6 +738,29 @@ class _HomeScreenState extends State<HomeScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: StatTile(
+                      icon: Icons.mic_rounded,
+                      value: '${_recordings.length}',
+                      label: 'පටිගත කිරීම්',
+                      color: AppTheme.accentTeal,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: StatTile(
+                      icon: Icons.description_outlined,
+                      value:
+                          '${_recordings.where((r) => r.transcript != null && r.transcript!.isNotEmpty).length}',
+                      label: 'පෙළට හැරවූ',
+                      color: AppTheme.primaryBlue,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
               AnimatedSwitcher(
                 duration: AppTheme.motionDuration,
                 switchInCurve: AppTheme.motionCurve,
