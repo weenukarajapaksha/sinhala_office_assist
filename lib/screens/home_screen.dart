@@ -673,7 +673,7 @@ class _HomeScreenState extends State<HomeScreen>
                   key: const ValueKey('selTitle'),
                 )
               : const Text(
-                  'E-Lekam',
+                  'E-ලේකම්',
                   key: ValueKey('normalTitle'),
                 ),
         ),
