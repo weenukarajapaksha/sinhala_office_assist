@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.sinhalaofficeassist.sinhala_office_assist"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = "26.3.11579264"
 
     compileOptions {

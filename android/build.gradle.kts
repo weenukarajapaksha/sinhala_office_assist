@@ -20,19 +20,21 @@ subprojects {
 }
 
 // Some plugins (e.g. jni_flutter, pulled in transitively via path_provider_android)
-// declare their own Android module with a hardcoded preferred NDK version, set after
-// their plugin is applied, so it must be overridden last (afterEvaluate). :app is
-// forced to evaluate early via evaluationDependsOn above, so guard against Gradle's
-// "already evaluated" error for that one project.
-fun Project.pinNdkVersion() {
-    extensions.findByType<com.android.build.gradle.BaseExtension>()?.ndkVersion =
-        "26.3.11579264"
+// declare their own Android module with a hardcoded preferred NDK/compileSdk version,
+// set after their plugin is applied, so it must be overridden last (afterEvaluate).
+// :app is forced to evaluate early via evaluationDependsOn above, so guard against
+// Gradle's "already evaluated" error for that one project.
+fun Project.pinAndroidVersions() {
+    extensions.findByType<com.android.build.gradle.BaseExtension>()?.apply {
+        ndkVersion = "26.3.11579264"
+        compileSdkVersion(36)
+    }
 }
 subprojects {
     if (project.state.executed) {
-        pinNdkVersion()
+        pinAndroidVersions()
     } else {
-        afterEvaluate { pinNdkVersion() }
+        afterEvaluate { pinAndroidVersions() }
     }
 }
 
