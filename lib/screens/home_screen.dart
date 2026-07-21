@@ -521,6 +521,7 @@ class _HomeScreenState extends State<HomeScreen>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ListTile(
+            contentPadding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
             leading: AnimatedSwitcher(
               duration: AppTheme.motionDuration,
               transitionBuilder: (child, animation) =>
@@ -532,17 +533,19 @@ class _HomeScreenState extends State<HomeScreen>
                       onChanged: (_) =>
                           controller.toggleRecording(recording.id),
                     )
-                  : Icon(
-                      isPlaying
-                          ? Icons.pause_circle_filled_rounded
-                          : Icons.play_circle_fill_rounded,
+                  : IconChip(
                       key: const ValueKey('play'),
+                      icon: isPlaying
+                          ? Icons.pause_rounded
+                          : Icons.play_arrow_rounded,
                       color: AppTheme.accentTeal,
-                      size: 32,
                     ),
             ),
             title: Text(
               recording.title ?? _formatDuration(recording.duration),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontSize: 16),
             ),
             subtitle: Text(
               '${recording.recordedAt.year}-${recording.recordedAt.month.toString().padLeft(2, '0')}-${recording.recordedAt.day.toString().padLeft(2, '0')} '
