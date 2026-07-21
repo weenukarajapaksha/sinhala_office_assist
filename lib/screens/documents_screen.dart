@@ -356,7 +356,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
         ],
       ),
     );
-    controller.dispose();
+    WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
 
     if (newTitle == null || newTitle.isEmpty) return;
 

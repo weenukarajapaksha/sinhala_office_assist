@@ -478,7 +478,7 @@ class _HomeScreenState extends State<HomeScreen>
         ],
       ),
     );
-    controller.dispose();
+    WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
 
     if (newTitle == null || newTitle.isEmpty) return;
 
