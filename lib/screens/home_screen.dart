@@ -16,6 +16,8 @@ import '../services/session_report_service.dart';
 import '../services/session_selection_controller.dart';
 import '../services/settings_repository.dart';
 import '../theme/app_theme.dart';
+import '../widgets/icon_chip.dart';
+import '../widgets/stat_tile.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({required this.selectionController, super.key});
