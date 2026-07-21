@@ -461,6 +461,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ListTile(
+            contentPadding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
             leading: AnimatedSwitcher(
               duration: AppTheme.motionDuration,
               transitionBuilder: (child, animation) =>
@@ -471,19 +472,31 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                       value: isSelected,
                       onChanged: (_) => controller.toggleDocument(document.id),
                     )
-                  : ClipRRect(
+                  : Container(
                       key: const ValueKey('thumb'),
-                      borderRadius: BorderRadius.circular(6),
-                      child: Image.memory(
-                        document.imageBytes,
-                        width: 48,
-                        height: 48,
-                        fit: BoxFit.cover,
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: AppTheme.divider,
+                          width: 1,
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(9),
+                        child: Image.memory(
+                          document.imageBytes,
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ),
             ),
             title: Text(
               document.title ?? _formatDateTime(document.scannedAt),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontSize: 16),
             ),
             subtitle: Text(_formatDateTime(document.scannedAt)),
             trailing: controller.selectionMode
