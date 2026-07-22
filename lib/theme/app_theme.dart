@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
-/// Central design system for Sinhala Office Assist.
+/// Central design system for Sinhala Office Assist ("E-Lekam").
 ///
 /// Clean, professional, office/government feel: deep trustworthy blue as
-/// primary, muted teal as accent, white/light-gray backgrounds, and
-/// Noto Sans Sinhala throughout with extra line-height for legibility.
+/// primary, muted teal as accent, and Noto Sans Sinhala throughout with
+/// extra line-height for legibility. Both a light and dark variant share
+/// the same structure via [_themeFor].
 ///
 /// The font is bundled locally (assets/fonts) rather than fetched at
 /// runtime via google_fonts, so text renders correctly offline.
@@ -22,6 +23,12 @@ class AppTheme {
   static const Color textSecondary = Color(0xFF5B6470);
   static const Color divider = Color(0xFFE1E4E8);
 
+  static const Color backgroundDark = Color(0xFF10161D);
+  static const Color surfaceDark = Color(0xFF1B232C);
+  static const Color textPrimaryDark = Color(0xFFE7EAED);
+  static const Color textSecondaryDark = Color(0xFF9AA5B1);
+  static const Color dividerDark = Color(0xFF2B333C);
+
   static const double borderRadius = 12.0;
   static const double sinhalaLineHeight = 1.5;
 
@@ -30,44 +37,55 @@ class AppTheme {
   static const Duration motionDuration = Duration(milliseconds: 220);
   static const Curve motionCurve = Curves.easeOutCubic;
 
-  static ThemeData get lightTheme {
-    final baseTextTheme = ThemeData.light().textTheme;
+  static ThemeData get lightTheme => _themeFor(isDark: false);
+  static ThemeData get darkTheme => _themeFor(isDark: true);
+
+  static ThemeData _themeFor({required bool isDark}) {
+    final background = isDark ? backgroundDark : backgroundLight;
+    final surface = isDark ? surfaceDark : surfaceWhite;
+    final onSurfacePrimary = isDark ? textPrimaryDark : textPrimary;
+    final onSurfaceSecondary = isDark ? textSecondaryDark : textSecondary;
+    final dividerColor = isDark ? dividerDark : divider;
+    final appBarBackground = isDark ? surfaceDark : primaryBlue;
+    final appBarForeground = isDark ? textPrimaryDark : surfaceWhite;
+
+    final baseTextTheme = isDark ? ThemeData.dark().textTheme : ThemeData.light().textTheme;
 
     final textTheme = baseTextTheme.copyWith(
       headlineLarge: baseTextTheme.headlineLarge?.copyWith(
         fontSize: 28,
         fontWeight: FontWeight.w700,
-        color: textPrimary,
+        color: onSurfacePrimary,
         height: sinhalaLineHeight,
       ),
       headlineMedium: baseTextTheme.headlineMedium?.copyWith(
         fontSize: 24,
         fontWeight: FontWeight.w700,
-        color: textPrimary,
+        color: onSurfacePrimary,
         height: sinhalaLineHeight,
       ),
       titleLarge: baseTextTheme.titleLarge?.copyWith(
         fontSize: 20,
         fontWeight: FontWeight.w600,
-        color: textPrimary,
+        color: onSurfacePrimary,
         height: sinhalaLineHeight,
       ),
       titleMedium: baseTextTheme.titleMedium?.copyWith(
         fontSize: 17,
         fontWeight: FontWeight.w600,
-        color: textPrimary,
+        color: onSurfacePrimary,
         height: sinhalaLineHeight,
       ),
       bodyLarge: baseTextTheme.bodyLarge?.copyWith(
         fontSize: 16,
         fontWeight: FontWeight.w400,
-        color: textPrimary,
+        color: onSurfacePrimary,
         height: sinhalaLineHeight,
       ),
       bodyMedium: baseTextTheme.bodyMedium?.copyWith(
         fontSize: 14,
         fontWeight: FontWeight.w400,
-        color: textSecondary,
+        color: onSurfaceSecondary,
         height: sinhalaLineHeight,
       ),
       labelLarge: baseTextTheme.labelLarge?.copyWith(
@@ -80,18 +98,28 @@ class AppTheme {
 
     return ThemeData(
       useMaterial3: true,
-      brightness: Brightness.light,
+      brightness: isDark ? Brightness.dark : Brightness.light,
       fontFamily: fontFamily,
-      scaffoldBackgroundColor: backgroundLight,
-      colorScheme: const ColorScheme.light(
-        primary: primaryBlue,
-        secondary: accentTeal,
-        surface: surfaceWhite,
-        error: Color(0xFFB3261E),
-        onPrimary: surfaceWhite,
-        onSecondary: surfaceWhite,
-        onSurface: textPrimary,
-      ),
+      scaffoldBackgroundColor: background,
+      colorScheme: isDark
+          ? ColorScheme.dark(
+              primary: primaryBlueLight,
+              secondary: accentTeal,
+              surface: surface,
+              error: const Color(0xFFCF6679),
+              onPrimary: surfaceWhite,
+              onSecondary: surfaceWhite,
+              onSurface: onSurfacePrimary,
+            )
+          : const ColorScheme.light(
+              primary: primaryBlue,
+              secondary: accentTeal,
+              surface: surfaceWhite,
+              error: Color(0xFFB3261E),
+              onPrimary: surfaceWhite,
+              onSecondary: surfaceWhite,
+              onSurface: textPrimary,
+            ),
       textTheme: textTheme,
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
@@ -103,21 +131,21 @@ class AppTheme {
         },
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: primaryBlue,
-        foregroundColor: surfaceWhite,
+        backgroundColor: appBarBackground,
+        foregroundColor: appBarForeground,
         elevation: 0,
         scrolledUnderElevation: 2,
         centerTitle: false,
         titleTextStyle: textTheme.titleLarge?.copyWith(
-          color: surfaceWhite,
+          color: appBarForeground,
           fontWeight: FontWeight.w600,
         ),
         toolbarTextStyle: textTheme.bodyMedium,
       ),
       cardTheme: CardThemeData(
-        color: surfaceWhite,
+        color: surface,
         elevation: 2,
-        shadowColor: Colors.black.withValues(alpha: 0.10),
+        shadowColor: Colors.black.withValues(alpha: isDark ? 0.35 : 0.10),
         clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(borderRadius),
@@ -140,13 +168,18 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: primaryBlue,
-          side: const BorderSide(color: primaryBlue, width: 1.2),
+          foregroundColor: isDark ? textPrimaryDark : primaryBlue,
+          side: BorderSide(
+            color: isDark ? textPrimaryDark : primaryBlue,
+            width: 1.2,
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(borderRadius),
           ),
-          textStyle: textTheme.labelLarge?.copyWith(color: primaryBlue),
+          textStyle: textTheme.labelLarge?.copyWith(
+            color: isDark ? textPrimaryDark : primaryBlue,
+          ),
           animationDuration: motionDuration,
         ),
       ),
@@ -166,7 +199,7 @@ class AppTheme {
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: surfaceWhite,
+        backgroundColor: surface,
         indicatorColor: accentTeal.withValues(alpha: 0.16),
         surfaceTintColor: Colors.transparent,
         elevation: 3,
@@ -175,13 +208,17 @@ class AppTheme {
           return textTheme.bodyMedium?.copyWith(
             fontSize: 12,
             fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-            color: selected ? primaryBlue : textSecondary,
+            color: selected
+                ? (isDark ? textPrimaryDark : primaryBlue)
+                : onSurfaceSecondary,
           );
         }),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return IconThemeData(
-            color: selected ? primaryBlue : textSecondary,
+            color: selected
+                ? (isDark ? textPrimaryDark : primaryBlue)
+                : onSurfaceSecondary,
           );
         }),
       ),
@@ -194,26 +231,40 @@ class AppTheme {
           borderRadius: BorderRadius.circular(4),
         ),
       ),
-      progressIndicatorTheme: const ProgressIndicatorThemeData(
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return accentTeal;
+          return null;
+        }),
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return accentTeal.withValues(alpha: 0.5);
+          }
+          return null;
+        }),
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(
         color: accentTeal,
-        linearTrackColor: divider,
-        circularTrackColor: divider,
+        linearTrackColor: dividerColor,
+        circularTrackColor: dividerColor,
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: primaryBlue,
-        contentTextStyle: textTheme.bodyMedium?.copyWith(color: surfaceWhite),
+        backgroundColor: isDark ? surfaceDark : primaryBlue,
+        contentTextStyle: textTheme.bodyMedium?.copyWith(
+          color: isDark ? textPrimaryDark : surfaceWhite,
+        ),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(borderRadius),
         ),
         actionTextColor: accentTeal,
       ),
-      dividerTheme: const DividerThemeData(
-        color: divider,
+      dividerTheme: DividerThemeData(
+        color: dividerColor,
         thickness: 1,
         space: 1,
       ),
-      iconTheme: const IconThemeData(color: primaryBlue),
+      iconTheme: IconThemeData(color: isDark ? textPrimaryDark : primaryBlue),
       splashColor: accentTeal.withValues(alpha: 0.10),
       highlightColor: accentTeal.withValues(alpha: 0.06),
     );

@@ -29,3 +29,8 @@ Future<void> deleteRecordedFile(String? filePath) async {
 
 Future<Uint8List> readAudioBytes(Recording recording) async =>
     recording.bytes ?? await File(recording.filePath!).readAsBytes();
+
+Future<int> fileSizeBytes(String path) async {
+  final file = File(path);
+  return await file.exists() ? file.length() : 0;
+}

@@ -24,3 +24,6 @@ Future<void> deleteRecordedFile(String? filePath) async {}
 
 Future<Uint8List> readAudioBytes(Recording recording) async =>
     recording.bytes!;
+
+/// Web recordings are stored inline as bytes, not as separate files.
+Future<int> fileSizeBytes(String path) async => 0;
