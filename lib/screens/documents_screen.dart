@@ -145,7 +145,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'පෙළ උපුටා ගැනීමට Gemini API key එකක් සකසන්න (රැස්කිරීම් තිරයේ 🔑)',
+              'පෙළ උපුටා ගැනීමට Gemini API key එකක් සකසන්න (සැකසුම්)',
             ),
           ),
         );
@@ -188,7 +188,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'පරිවර්තනය කිරීමට Gemini API key එකක් සකසන්න (රැස්කිරීම් තිරයේ 🔑)',
+              'පරිවර්තනය කිරීමට Gemini API key එකක් සකසන්න (සැකසුම්)',
             ),
           ),
         );
@@ -235,7 +235,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'සාරාංශ කිරීමට Gemini API key එකක් සකසන්න (රැස්කිරීම් තිරයේ 🔑)',
+              'සාරාංශ කිරීමට Gemini API key එකක් සකසන්න (සැකසුම්)',
             ),
           ),
         );

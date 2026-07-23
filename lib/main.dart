@@ -7,6 +7,7 @@ import 'screens/onboarding_screen.dart';
 import 'screens/root_screen.dart';
 import 'services/background_recording_service.dart';
 import 'services/settings_repository.dart';
+import 'services/theme_controller.dart';
 import 'theme/app_theme.dart';
 
 void main() {
@@ -17,8 +18,34 @@ void main() {
   runApp(const SinhalaOfficeAssistApp());
 }
 
-class SinhalaOfficeAssistApp extends StatelessWidget {
+class SinhalaOfficeAssistApp extends StatefulWidget {
   const SinhalaOfficeAssistApp({super.key});
+
+  @override
+  State<SinhalaOfficeAssistApp> createState() =>
+      _SinhalaOfficeAssistAppState();
+}
+
+class _SinhalaOfficeAssistAppState extends State<SinhalaOfficeAssistApp> {
+  final ThemeController _themeController = ThemeController(
+    SettingsRepository(),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _themeController.addListener(_onThemeChanged);
+    unawaited(_themeController.load());
+  }
+
+  @override
+  void dispose() {
+    _themeController.removeListener(_onThemeChanged);
+    _themeController.dispose();
+    super.dispose();
+  }
+
+  void _onThemeChanged() => setState(() {});
 
   @override
   Widget build(BuildContext context) {
@@ -26,13 +53,17 @@ class SinhalaOfficeAssistApp extends StatelessWidget {
       title: 'E-Lekam',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: const AppEntryPoint(),
+      darkTheme: AppTheme.darkTheme,
+      themeMode: _themeController.themeMode,
+      home: AppEntryPoint(themeController: _themeController),
     );
   }
 }
 
 class AppEntryPoint extends StatefulWidget {
-  const AppEntryPoint({super.key});
+  const AppEntryPoint({required this.themeController, super.key});
+
+  final ThemeController themeController;
 
   @override
   State<AppEntryPoint> createState() => _AppEntryPointState();
@@ -65,7 +96,7 @@ class _AppEntryPointState extends State<AppEntryPoint> {
       return const Scaffold(body: SizedBox.shrink());
     }
     return _hasSeenOnboarding!
-        ? const RootScreen()
+        ? RootScreen(themeController: widget.themeController)
         : OnboardingScreen(onFinished: _finishOnboarding);
   }
 }

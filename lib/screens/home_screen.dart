@@ -241,39 +241,6 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  Future<void> _showApiKeyDialog() async {
-    final controller = TextEditingController(
-      text: await _settings.getGeminiApiKey() ?? '',
-    );
-    if (!mounted) return;
-    final saved = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Gemini API Key'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          obscureText: true,
-          decoration: const InputDecoration(hintText: 'API key'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-    WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
-
-    if (saved == null || saved.isEmpty) return;
-    await _settings.saveGeminiApiKey(saved);
-  }
-
   Future<void> _copyTranscript(String transcript) async {
     await Clipboard.setData(ClipboardData(text: transcript));
     if (mounted) {
@@ -724,11 +691,6 @@ class _HomeScreenState extends State<HomeScreen>
                         onPressed: _recordings.isEmpty
                             ? null
                             : controller.enterSelectionMode,
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.key_outlined),
-                        tooltip: 'Gemini API Key',
-                        onPressed: _showApiKeyDialog,
                       ),
                     ],
                   ),
