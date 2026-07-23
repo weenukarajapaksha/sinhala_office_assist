@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:printing/printing.dart';
 import 'package:record/record.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../models/recording.dart';
 import '../services/audio_storage.dart';
@@ -248,6 +249,10 @@ class _HomeScreenState extends State<HomeScreen>
         const SnackBar(content: Text('පිටපත් කරන ලදී')),
       );
     }
+  }
+
+  Future<void> _shareText(String text) async {
+    await SharePlus.instance.share(ShareParams(text: text));
   }
 
   Future<void> _generateReport() async {
@@ -595,6 +600,12 @@ class _HomeScreenState extends State<HomeScreen>
                           tooltip: 'පිටපත් කරන්න',
                           onPressed: () =>
                               _copyTranscript(recording.transcript!),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.share_outlined, size: 18),
+                          color: AppTheme.textSecondary,
+                          tooltip: 'බෙදාගන්න',
+                          onPressed: () => _shareText(recording.transcript!),
                         ),
                       ],
                     ),
