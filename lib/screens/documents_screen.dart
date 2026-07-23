@@ -606,6 +606,13 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                                   _copyText(document.extractedText!),
                             ),
                             IconButton(
+                              icon: const Icon(Icons.share_outlined, size: 18),
+                              color: AppTheme.textSecondary,
+                              tooltip: 'බෙදාගන්න',
+                              onPressed: () =>
+                                  _shareText(document.extractedText!),
+                            ),
+                            IconButton(
                               icon: const Icon(
                                 Icons.picture_as_pdf_outlined,
                                 size: 18,
@@ -671,6 +678,17 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                                         color: AppTheme.textSecondary,
                                         tooltip: 'පිටපත් කරන්න',
                                         onPressed: () => _copyText(
+                                          document.translatedText!,
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.share_outlined,
+                                          size: 16,
+                                        ),
+                                        color: AppTheme.textSecondary,
+                                        tooltip: 'බෙදාගන්න',
+                                        onPressed: () => _shareText(
                                           document.translatedText!,
                                         ),
                                       ),
