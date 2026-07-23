@@ -285,6 +285,10 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     }
   }
 
+  Future<void> _shareText(String text) async {
+    await SharePlus.instance.share(ShareParams(text: text));
+  }
+
   Future<void> _exportDocument(ScannedDocument document) async {
     try {
       final bytes = await _reportService.buildSingleDocumentPdf(document);
