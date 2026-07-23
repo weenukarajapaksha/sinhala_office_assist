@@ -762,6 +762,16 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                                         onPressed: () =>
                                             _copyText(document.summaryText!),
                                       ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.share_outlined,
+                                          size: 16,
+                                        ),
+                                        color: AppTheme.textSecondary,
+                                        tooltip: 'බෙදාගන්න',
+                                        onPressed: () =>
+                                            _shareText(document.summaryText!),
+                                      ),
                                     ],
                                   ),
                                 )
