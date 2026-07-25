@@ -562,20 +562,20 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        Text(
+                          document.extractedText!,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 4,
                           children: [
-                            Expanded(
-                              child: Text(
-                                document.extractedText!,
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                            ),
                             IconButton(
                               icon: const Icon(
                                 Icons.refresh_rounded,
                                 size: 18,
                               ),
+                              visualDensity: VisualDensity.compact,
                               color: AppTheme.textSecondary,
                               tooltip: 'නැවත උපුටා ගන්න',
                               onPressed: () => _extractText(document),
@@ -585,6 +585,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                                 Icons.translate_rounded,
                                 size: 18,
                               ),
+                              visualDensity: VisualDensity.compact,
                               color: AppTheme.textSecondary,
                               tooltip: 'පරිවර්තනය කරන්න',
                               onPressed: () => _translateDocument(document),
@@ -594,12 +595,14 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                                 Icons.summarize_outlined,
                                 size: 18,
                               ),
+                              visualDensity: VisualDensity.compact,
                               color: AppTheme.textSecondary,
                               tooltip: 'සාරාංශ කරන්න',
                               onPressed: () => _summarizeDocument(document),
                             ),
                             IconButton(
                               icon: const Icon(Icons.copy_outlined, size: 18),
+                              visualDensity: VisualDensity.compact,
                               color: AppTheme.textSecondary,
                               tooltip: 'පිටපත් කරන්න',
                               onPressed: () =>
@@ -607,6 +610,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                             ),
                             IconButton(
                               icon: const Icon(Icons.share_outlined, size: 18),
+                              visualDensity: VisualDensity.compact,
                               color: AppTheme.textSecondary,
                               tooltip: 'බෙදාගන්න',
                               onPressed: () =>
@@ -617,6 +621,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                                 Icons.picture_as_pdf_outlined,
                                 size: 18,
                               ),
+                              visualDensity: VisualDensity.compact,
                               color: AppTheme.textSecondary,
                               tooltip: 'PDF ලෙස බාගන්න',
                               onPressed: () => _exportDocument(document),
@@ -658,39 +663,47 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                                     ),
                                     border: Border.all(color: AppTheme.divider),
                                   ),
-                                  child: Row(
+                                  child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      Expanded(
-                                        child: Text(
-                                          document.translatedText!,
-                                          style: Theme.of(
-                                            context,
-                                          ).textTheme.bodyMedium,
-                                        ),
+                                      Text(
+                                        document.translatedText!,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodyMedium,
                                       ),
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.copy_outlined,
-                                          size: 16,
-                                        ),
-                                        color: AppTheme.textSecondary,
-                                        tooltip: 'පිටපත් කරන්න',
-                                        onPressed: () => _copyText(
-                                          document.translatedText!,
-                                        ),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.share_outlined,
-                                          size: 16,
-                                        ),
-                                        color: AppTheme.textSecondary,
-                                        tooltip: 'බෙදාගන්න',
-                                        onPressed: () => _shareText(
-                                          document.translatedText!,
-                                        ),
+                                      const SizedBox(height: 4),
+                                      Wrap(
+                                        spacing: 4,
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.copy_outlined,
+                                              size: 16,
+                                            ),
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                            color: AppTheme.textSecondary,
+                                            tooltip: 'පිටපත් කරන්න',
+                                            onPressed: () => _copyText(
+                                              document.translatedText!,
+                                            ),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.share_outlined,
+                                              size: 16,
+                                            ),
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                            color: AppTheme.textSecondary,
+                                            tooltip: 'බෙදාගන්න',
+                                            onPressed: () => _shareText(
+                                              document.translatedText!,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
