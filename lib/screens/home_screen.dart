@@ -579,33 +579,45 @@ class _HomeScreenState extends State<HomeScreen>
                 ? Padding(
                     key: const ValueKey('transcript'),
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    child: Row(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Text(
-                            recording.transcript!,
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
+                        Text(
+                          recording.transcript!,
+                          style: Theme.of(context).textTheme.bodyMedium,
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.refresh_rounded, size: 18),
-                          color: AppTheme.textSecondary,
-                          tooltip: 'නැවත පෙළට හරවන්න',
-                          onPressed: () => _transcribeRecording(recording),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.copy_outlined, size: 18),
-                          color: AppTheme.textSecondary,
-                          tooltip: 'පිටපත් කරන්න',
-                          onPressed: () =>
-                              _copyTranscript(recording.transcript!),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.share_outlined, size: 18),
-                          color: AppTheme.textSecondary,
-                          tooltip: 'බෙදාගන්න',
-                          onPressed: () => _shareText(recording.transcript!),
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 4,
+                          children: [
+                            IconButton(
+                              icon: const Icon(
+                                Icons.refresh_rounded,
+                                size: 18,
+                              ),
+                              visualDensity: VisualDensity.compact,
+                              color: AppTheme.textSecondary,
+                              tooltip: 'නැවත පෙළට හරවන්න',
+                              onPressed: () =>
+                                  _transcribeRecording(recording),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.copy_outlined, size: 18),
+                              visualDensity: VisualDensity.compact,
+                              color: AppTheme.textSecondary,
+                              tooltip: 'පිටපත් කරන්න',
+                              onPressed: () =>
+                                  _copyTranscript(recording.transcript!),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.share_outlined, size: 18),
+                              visualDensity: VisualDensity.compact,
+                              color: AppTheme.textSecondary,
+                              tooltip: 'බෙදාගන්න',
+                              onPressed: () =>
+                                  _shareText(recording.transcript!),
+                            ),
+                          ],
                         ),
                       ],
                     ),

@@ -753,37 +753,47 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                                       ),
                                     ),
                                   ),
-                                  child: Row(
+                                  child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      Expanded(
-                                        child: Text(
-                                          document.summaryText!,
-                                          style: Theme.of(
-                                            context,
-                                          ).textTheme.bodyMedium,
-                                        ),
+                                      Text(
+                                        document.summaryText!,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodyMedium,
                                       ),
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.copy_outlined,
-                                          size: 16,
-                                        ),
-                                        color: AppTheme.textSecondary,
-                                        tooltip: 'පිටපත් කරන්න',
-                                        onPressed: () =>
-                                            _copyText(document.summaryText!),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.share_outlined,
-                                          size: 16,
-                                        ),
-                                        color: AppTheme.textSecondary,
-                                        tooltip: 'බෙදාගන්න',
-                                        onPressed: () =>
-                                            _shareText(document.summaryText!),
+                                      const SizedBox(height: 4),
+                                      Wrap(
+                                        spacing: 4,
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.copy_outlined,
+                                              size: 16,
+                                            ),
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                            color: AppTheme.textSecondary,
+                                            tooltip: 'පිටපත් කරන්න',
+                                            onPressed: () => _copyText(
+                                              document.summaryText!,
+                                            ),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.share_outlined,
+                                              size: 16,
+                                            ),
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                            color: AppTheme.textSecondary,
+                                            tooltip: 'බෙදාගන්න',
+                                            onPressed: () => _shareText(
+                                              document.summaryText!,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
