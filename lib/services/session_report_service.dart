@@ -105,6 +105,13 @@ class SessionReportService {
     maxWidthPoints: _contentWidth,
   );
 
+  Future<pw.Widget> _caption(String text) => SinhalaPdfTextRenderer.render(
+    text,
+    fontSize: 10,
+    color: const Color(0xFF616161),
+    maxWidthPoints: _contentWidth,
+  );
+
   Future<pw.Widget> _label(String text) => SinhalaPdfTextRenderer.render(
     text,
     fontSize: 12,
@@ -213,10 +220,7 @@ class SessionReportService {
     final children = <pw.Widget>[
       await _title(document.title ?? document.id),
       pw.SizedBox(height: 4),
-      pw.Text(
-        'ලේඛනගත කළේ: ${_formatDateTime(document.scannedAt)}',
-        style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
-      ),
+      await _caption('ලේඛනගත කළේ: ${_formatDateTime(document.scannedAt)}'),
       pw.SizedBox(height: 16),
       await _heading('උපුටාගත් පෙළ'),
       pw.SizedBox(height: 6),
