@@ -1,13 +1,13 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/painting.dart' show Color;
 import 'package:http/http.dart' as http;
-import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import '../models/recording.dart';
 import '../models/scanned_document.dart';
+import 'sinhala_pdf_text_renderer.dart';
 
 class SessionReportException implements Exception {
   SessionReportException(this.message);
@@ -20,8 +20,12 @@ class SessionReportException implements Exception {
 /// Summarizes a group of recordings' transcripts and scanned documents'
 /// extracted text via Gemini, then renders the summary plus full source
 /// text into a downloadable PDF.
+///
+/// All Sinhala text in the PDF is rasterized via [SinhalaPdfTextRenderer]
+/// rather than drawn as native PDF text — see that class for why.
 class SessionReportService {
   static const _model = 'gemini-3.5-flash';
+  static const _contentWidth = 481.0; // PdfPageFormat.a4.availableWidth
 
   Future<String> generateSummary({
     required String apiKey,
@@ -89,110 +93,114 @@ class SessionReportService {
         .trim();
   }
 
-  Future<pw.Document> _newSinhalaDocument() async {
-    final fontData = await rootBundle.load(
-      'assets/fonts/NotoSansSinhala-VariableFont.ttf',
-    );
-    final sinhalaFont = pw.Font.ttf(fontData);
-    return pw.Document(
-      theme: pw.ThemeData.withFont(
-        base: sinhalaFont,
-        bold: sinhalaFont,
-        italic: sinhalaFont,
-        boldItalic: sinhalaFont,
-      ),
-    );
-  }
+  Future<pw.Widget> _heading(String text) => SinhalaPdfTextRenderer.render(
+    text,
+    fontSize: 14,
+    maxWidthPoints: _contentWidth,
+  );
+
+  Future<pw.Widget> _title(String text) => SinhalaPdfTextRenderer.render(
+    text,
+    fontSize: 22,
+    maxWidthPoints: _contentWidth,
+  );
+
+  Future<pw.Widget> _label(String text) => SinhalaPdfTextRenderer.render(
+    text,
+    fontSize: 12,
+    maxWidthPoints: _contentWidth,
+  );
+
+  Future<pw.Widget> _bullet(String text) => SinhalaPdfTextRenderer.render(
+    text,
+    fontSize: 11,
+    maxWidthPoints: _contentWidth,
+  );
+
+  Future<List<pw.Widget>> _body(String text) =>
+      SinhalaPdfTextRenderer.renderParagraphs(
+        text,
+        fontSize: 11,
+        maxWidthPoints: _contentWidth,
+      );
+
+  Future<pw.Document> _newDocument() async => pw.Document();
 
   Future<Uint8List> buildPdf({
     required String summary,
     List<Recording> recordings = const [],
     List<ScannedDocument> documents = const [],
   }) async {
-    final doc = await _newSinhalaDocument();
+    final doc = await _newDocument();
 
-    doc.addPage(
-      pw.MultiPage(
-        build: (context) => [
-          pw.Text('සැසි වාර්තාව', style: const pw.TextStyle(fontSize: 22)),
-          pw.SizedBox(height: 4),
-          pw.Text(
-            'සකස් කළේ: ${_formatDateTime(DateTime.now())}',
-            style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+    final children = <pw.Widget>[
+      await _title('සැසි වාර්තාව'),
+      pw.SizedBox(height: 4),
+      await _caption('සකස් කළේ: ${_formatDateTime(DateTime.now())}'),
+    ];
+
+    if (recordings.isNotEmpty) {
+      children.add(pw.SizedBox(height: 16));
+      children.add(await _heading('ඇතුළත් පටිගත කිරීම්'));
+      children.add(pw.SizedBox(height: 6));
+      for (final r in recordings) {
+        children.add(
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(bottom: 4),
+            child: await _bullet(
+              '• ${r.title ?? r.id} — ${_formatDateTime(r.recordedAt)} (${_formatDuration(r.duration)})',
+            ),
           ),
-          if (recordings.isNotEmpty) ...[
-            pw.SizedBox(height: 16),
-            pw.Text(
-              'ඇතුළත් පටිගත කිරීම්',
-              style: const pw.TextStyle(fontSize: 14),
+        );
+      }
+    }
+
+    if (documents.isNotEmpty) {
+      children.add(pw.SizedBox(height: 16));
+      children.add(await _heading('ඇතුළත් ලේඛන'));
+      children.add(pw.SizedBox(height: 6));
+      for (final d in documents) {
+        children.add(
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(bottom: 4),
+            child: await _bullet(
+              '• ${d.title ?? d.id} — ${_formatDateTime(d.scannedAt)}',
             ),
-            pw.SizedBox(height: 6),
-            ...recordings.map(
-              (r) => pw.Padding(
-                padding: const pw.EdgeInsets.only(bottom: 4),
-                child: pw.Text(
-                  '• ${r.title ?? r.id} — ${_formatDateTime(r.recordedAt)} (${_formatDuration(r.duration)})',
-                  style: const pw.TextStyle(fontSize: 11),
-                ),
-              ),
-            ),
-          ],
-          if (documents.isNotEmpty) ...[
-            pw.SizedBox(height: 16),
-            pw.Text('ඇතුළත් ලේඛන', style: const pw.TextStyle(fontSize: 14)),
-            pw.SizedBox(height: 6),
-            ...documents.map(
-              (d) => pw.Padding(
-                padding: const pw.EdgeInsets.only(bottom: 4),
-                child: pw.Text(
-                  '• ${d.title ?? d.id} — ${_formatDateTime(d.scannedAt)}',
-                  style: const pw.TextStyle(fontSize: 11),
-                ),
-              ),
-            ),
-          ],
-          pw.SizedBox(height: 16),
-          pw.Text('සාරාංශය', style: const pw.TextStyle(fontSize: 14)),
-          pw.SizedBox(height: 6),
-          pw.Text(summary, style: const pw.TextStyle(fontSize: 11)),
-          if (recordings.isNotEmpty) ...[
-            pw.SizedBox(height: 20),
-            pw.Text('සම්පූර්ණ පිටපත්', style: const pw.TextStyle(fontSize: 14)),
-            pw.SizedBox(height: 6),
-            ...recordings.expand(
-              (r) => [
-                pw.Text(r.title ?? r.id, style: const pw.TextStyle(fontSize: 12)),
-                pw.SizedBox(height: 4),
-                pw.Text(
-                  r.transcript ?? '',
-                  style: const pw.TextStyle(fontSize: 10),
-                ),
-                pw.SizedBox(height: 14),
-              ],
-            ),
-          ],
-          if (documents.isNotEmpty) ...[
-            pw.SizedBox(height: 20),
-            pw.Text(
-              'ලේඛනවල සම්පූර්ණ පෙළ',
-              style: const pw.TextStyle(fontSize: 14),
-            ),
-            pw.SizedBox(height: 6),
-            ...documents.expand(
-              (d) => [
-                pw.Text(d.title ?? d.id, style: const pw.TextStyle(fontSize: 12)),
-                pw.SizedBox(height: 4),
-                pw.Text(
-                  d.extractedText ?? '',
-                  style: const pw.TextStyle(fontSize: 10),
-                ),
-                pw.SizedBox(height: 14),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
+          ),
+        );
+      }
+    }
+
+    children.add(pw.SizedBox(height: 16));
+    children.add(await _heading('සාරාංශය'));
+    children.add(pw.SizedBox(height: 6));
+    children.addAll(await _body(summary));
+
+    if (recordings.isNotEmpty) {
+      children.add(pw.SizedBox(height: 12));
+      children.add(await _heading('සම්පූර්ණ පිටපත්'));
+      children.add(pw.SizedBox(height: 6));
+      for (final r in recordings) {
+        children.add(await _label(r.title ?? r.id));
+        children.add(pw.SizedBox(height: 4));
+        children.addAll(await _body(r.transcript ?? ''));
+        children.add(pw.SizedBox(height: 10));
+      }
+    }
+
+    if (documents.isNotEmpty) {
+      children.add(pw.SizedBox(height: 12));
+      children.add(await _heading('ලේඛනවල සම්පූර්ණ පෙළ'));
+      children.add(pw.SizedBox(height: 6));
+      for (final d in documents) {
+        children.add(await _label(d.title ?? d.id));
+        children.add(pw.SizedBox(height: 4));
+        children.addAll(await _body(d.extractedText ?? ''));
+        children.add(pw.SizedBox(height: 10));
+      }
+    }
+
+    doc.addPage(pw.MultiPage(build: (context) => children));
 
     return doc.save();
   }
@@ -200,48 +208,36 @@ class SessionReportService {
   /// Renders a single scanned document's extracted text (plus translation
   /// and summary, if generated) as a standalone PDF for direct download.
   Future<Uint8List> buildSingleDocumentPdf(ScannedDocument document) async {
-    final doc = await _newSinhalaDocument();
+    final doc = await _newDocument();
 
-    doc.addPage(
-      pw.MultiPage(
-        build: (context) => [
-          pw.Text(
-            document.title ?? document.id,
-            style: const pw.TextStyle(fontSize: 22),
-          ),
-          pw.SizedBox(height: 4),
-          pw.Text(
-            'ලේඛනගත කළේ: ${_formatDateTime(document.scannedAt)}',
-            style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
-          ),
-          pw.SizedBox(height: 16),
-          pw.Text('උපුටාගත් පෙළ', style: const pw.TextStyle(fontSize: 14)),
-          pw.SizedBox(height: 6),
-          pw.Text(
-            document.extractedText ?? '',
-            style: const pw.TextStyle(fontSize: 11),
-          ),
-          if (document.translatedText != null) ...[
-            pw.SizedBox(height: 16),
-            pw.Text('පරිවර්තනය', style: const pw.TextStyle(fontSize: 14)),
-            pw.SizedBox(height: 6),
-            pw.Text(
-              document.translatedText!,
-              style: const pw.TextStyle(fontSize: 11),
-            ),
-          ],
-          if (document.summaryText != null) ...[
-            pw.SizedBox(height: 16),
-            pw.Text('සාරාංශය', style: const pw.TextStyle(fontSize: 14)),
-            pw.SizedBox(height: 6),
-            pw.Text(
-              document.summaryText!,
-              style: const pw.TextStyle(fontSize: 11),
-            ),
-          ],
-        ],
+    final children = <pw.Widget>[
+      await _title(document.title ?? document.id),
+      pw.SizedBox(height: 4),
+      pw.Text(
+        'ලේඛනගත කළේ: ${_formatDateTime(document.scannedAt)}',
+        style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
       ),
-    );
+      pw.SizedBox(height: 16),
+      await _heading('උපුටාගත් පෙළ'),
+      pw.SizedBox(height: 6),
+      ...await _body(document.extractedText ?? ''),
+    ];
+
+    if (document.translatedText != null) {
+      children.add(pw.SizedBox(height: 12));
+      children.add(await _heading('පරිවර්තනය'));
+      children.add(pw.SizedBox(height: 6));
+      children.addAll(await _body(document.translatedText!));
+    }
+
+    if (document.summaryText != null) {
+      children.add(pw.SizedBox(height: 12));
+      children.add(await _heading('සාරාංශය'));
+      children.add(pw.SizedBox(height: 6));
+      children.addAll(await _body(document.summaryText!));
+    }
+
+    doc.addPage(pw.MultiPage(build: (context) => children));
 
     return doc.save();
   }
